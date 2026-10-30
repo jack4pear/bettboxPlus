@@ -259,12 +259,23 @@ class Request {
   Future<Map<String, dynamic>?> checkForUpdate() async {
     try {
       // /releases/latest excludes prereleases; this fork starts on the pre channel.
-      final response = await _dio.get<List<dynamic>>(
+      final response = await _dio.get<Uint8List>(
         'https://api.github.com/repos/$repository/releases',
         queryParameters: {'per_page': 30},
+        options: Options(responseType: ResponseType.bytes),
       );
+      final releases =
+          jsonDecode(
+                utf8.decode(
+                  _decompressIfNeeded(
+                    _bytesFromResponse(response),
+                    response.headers,
+                  ),
+                ),
+              )
+              as List<dynamic>;
       return selectBettboxPlusUpdate(
-        response.data ?? [],
+        releases,
         globalState.packageInfo.version,
         includePrerelease: globalState.isPre,
       );

@@ -33,11 +33,14 @@ Map<String, dynamic>? selectBettboxPlusUpdate(
   for (final release in releases) {
     if (release is! Map ||
         release['draft'] == true ||
-        (!includePrerelease && release['prerelease'] == true))
+        (!includePrerelease && release['prerelease'] == true)) {
       continue;
+    }
     final tag = release['tag_name'];
-    if (tag is! String || (compareBettboxPlusVersions(tag, newest) ?? -1) <= 0)
+    if (tag is! String ||
+        (compareBettboxPlusVersions(tag, newest) ?? -1) <= 0) {
       continue;
+    }
     newest = tag;
     selected = {
       'tag_name': tag,

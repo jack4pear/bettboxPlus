@@ -41,7 +41,7 @@ jobs:
           cp build-lock.json dist/build-lock.json
           cp docs/ACCEPTANCE.json dist/ACCEPTANCE.json
           cd dist
-          sha256sum *.exe *.zip *.apk *.json INSTALL.md > SHA256SUMS.txt
+          sha256sum -- ./*.exe ./*.zip ./*.apk ./*.json INSTALL.md > SHA256SUMS.txt
           cp ../docs/RELEASE-NOTES.md ../release.md
       - name: Publish prerelease
         run: gh release create "$RELEASE_TAG" dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease --title "BettboxPlus $RELEASE_TAG" --notes-file release.md

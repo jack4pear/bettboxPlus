@@ -15,9 +15,10 @@ Python 使用 uv 或既有运行时，Go/Rust 由 mise 管理。Flutter 固定�
 ```sh
 python scripts/verify-source.py
 python scripts/setup-toolchain.py
-export PATH="$PWD/.toolchain/go/bin:$PATH" GOTOOLCHAIN=local
-(cd core && go test -tags with_gvisor -timeout 5m ./...)
-(cd core/Clash.Meta && CGO_ENABLED=1 go test -race -timeout 5m ./adapter ./adapter/outboundgroup ./adapter/provider ./tunnel)
+mise link go@1.26.10-bettboxplus "$PWD/.toolchain/go"
+export GOTOOLCHAIN=local
+(cd core && mise exec go@1.26.10-bettboxplus -- go test -tags with_gvisor -timeout 5m ./...)
+(cd core/Clash.Meta && CGO_ENABLED=1 mise exec go@1.26.10-bettboxplus -- go test -race -timeout 5m ./adapter ./adapter/outboundgroup ./adapter/provider ./tunnel)
 flutter pub get
 dart run build_runner build
 flutter test test/common/patch_yaml_config_test.dart test/models/profile_save_test.dart test/common/qr_import_test.dart

@@ -1,0 +1,4 @@
+# GitHub-hosted ARM64 Windows label, newer than older actionlint catalogs.
+self-hosted-runner:
+  labels:
+    - windows-11-arm
