@@ -28,16 +28,16 @@
         tools:ignore="ProtectedPermissions" />
 
     <application
-        android:name=".BettboxApplication"
+        android:name=".BettboxPlusApplication"
         android:hardwareAccelerated="true"
         android:icon="@mipmap/ic_launcher_light"
         android:roundIcon="@mipmap/ic_launcher_round_light"
-        android:label="Bettbox"
+        android:label="BettboxPlus"
         android:banner="@drawable/tv_banner"
         android:networkSecurityConfig="@xml/network_security_config"
         android:enableOnBackInvokedCallback="false">
         <activity
-            android:name="com.appshub.bettbox.MainActivity"
+            android:name="io.github.jack4pear.bettboxplus.MainActivity"
             android:icon="@mipmap/ic_launcher_light"
             android:roundIcon="@mipmap/ic_launcher_round_light"
             android:alwaysRetainTaskState="true"
@@ -72,18 +72,18 @@
                 <data android:scheme="clash" android:host="install-config" />
                 <data android:scheme="clashmeta" android:host="install-config" />
                 <data android:scheme="flclash" android:host="install-config" />
-                <data android:scheme="bettbox" android:host="install-config" />
+                <data android:scheme="bettboxplus" android:host="install-config" />
             </intent-filter>
         </activity>
 
         <!-- Light icon alias (kept for legacy user compatibility) -->
         <activity-alias
-            android:name="com.appshub.bettbox.MainActivityLight"
+            android:name="io.github.jack4pear.bettboxplus.MainActivityLight"
             android:enabled="false"
             android:exported="true"
             android:icon="@mipmap/ic_launcher_light"
             android:roundIcon="@mipmap/ic_launcher_round_light"
-            android:targetActivity="com.appshub.bettbox.MainActivity">
+            android:targetActivity="io.github.jack4pear.bettboxplus.MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -101,18 +101,18 @@
                 <data android:scheme="clash" android:host="install-config" />
                 <data android:scheme="clashmeta" android:host="install-config" />
                 <data android:scheme="flclash" android:host="install-config" />
-                <data android:scheme="bettbox" android:host="install-config" />
+                <data android:scheme="bettboxplus" android:host="install-config" />
             </intent-filter>
         </activity-alias>
 
         <!-- Dark icon alias — disabled by default -->
         <activity-alias
-            android:name="com.appshub.bettbox.MainActivityDark"
+            android:name="io.github.jack4pear.bettboxplus.MainActivityDark"
             android:enabled="false"
             android:exported="true"
             android:icon="@mipmap/ic_launcher"
             android:roundIcon="@mipmap/ic_launcher_round"
-            android:targetActivity="com.appshub.bettbox.MainActivity">
+            android:targetActivity="io.github.jack4pear.bettboxplus.MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -132,7 +132,7 @@
                 <data android:scheme="clash" android:host="install-config" />
                 <data android:scheme="clashmeta" android:host="install-config" />
                 <data android:scheme="flclash" android:host="install-config" />
-                <data android:scheme="bettbox" android:host="install-config" />
+                <data android:scheme="bettboxplus" android:host="install-config" />
             </intent-filter>
         </activity-alias>
 
@@ -149,10 +149,10 @@
         </activity>
 
         <service
-            android:name=".services.BettboxTileService"
+            android:name=".services.BettboxPlusTileService"
             android:exported="true"
             android:icon="@drawable/ic_tile"
-            android:label="Bettbox"
+            android:label="BettboxPlus"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
             tools:targetApi="n">
             <intent-filter>
@@ -176,7 +176,7 @@
         </provider>
 
         <service
-            android:name=".services.BettboxVpnService"
+            android:name=".services.BettboxPlusVpnService"
             android:exported="false"
             android:foregroundServiceType="specialUse"
             android:permission="android.permission.BIND_VPN_SERVICE">
@@ -188,7 +188,7 @@
         </service>
 
         <service
-            android:name=".services.BettboxService"
+            android:name=".services.BettboxPlusService"
             android:exported="false"
             android:foregroundServiceType="specialUse">
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="Proxy" />

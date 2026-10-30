@@ -159,7 +159,7 @@ class System {
           appPath.corePath,
         ]);
         if (removeResult.exitCode == 0) {
-          commonPrint.log('Cleared quarantine attribute from BettboxCore');
+          commonPrint.log('Cleared quarantine attribute from BettboxPlusCore');
         } else {
           quarantineCleared = false;
           commonPrint.warn(
@@ -177,7 +177,7 @@ class System {
       if (result.exitCode != 0) {
         globalState.showNotifier(
           !quarantineCleared
-              ? 'Failed to authorize BettboxCore. Try: xattr -dr com.apple.quarantine /Applications/Bettbox.app'
+              ? 'Failed to authorize BettboxPlusCore. Try: xattr -dr com.apple.quarantine /Applications/BettboxPlus.app'
               : appLocalizations.tunEnableRequireAdmin,
         );
         return AuthorizeCode.error;
@@ -248,9 +248,9 @@ class System {
 
   static const _setcapFailedExit = 12;
 
-  static const _polkitRuleFileName = '90-bettbox.rules';
+  static const _polkitRuleFileName = '90-bettboxplus.rules';
 
-  static const _legacyPolkitRuleFileName = '99-bettbox.rules';
+  static const _legacyPolkitRuleFileName = '99-bettboxplus.rules';
 
   static const _polkitRuleSystemPath =
       '/usr/share/polkit-1/rules.d/$_polkitRuleFileName';
@@ -285,9 +285,9 @@ class System {
   static const _polkitRuleEtcPath =
       '/etc/polkit-1/rules.d/$_polkitRuleFileName';
 
-  static const _polkitRuleEtcMarker = 'bettbox-polkit-rule:etc';
+  static const _polkitRuleEtcMarker = 'bettboxplus-polkit-rule:etc';
 
-  static const _polkitRuleFailedMarker = 'bettbox-polkit-rule:failed';
+  static const _polkitRuleFailedMarker = 'bettboxplus-polkit-rule:failed';
 
   static const _polkitRuleSettledKey = 'linux_polkit_rule_settled';
 
@@ -999,7 +999,7 @@ class MacOS {
 
   Future<void> _setDns() async {
     // Restore a previous managed value first so repeated enable operations never
-    // overwrite the real system DNS backup with Bettbox's own hijack DNS.
+    // overwrite the real system DNS backup with BettboxPlus's own hijack DNS.
     if (!await _restoreDns()) return;
 
     final serviceName = await defaultServiceName;

@@ -1,12 +1,12 @@
-package com.appshub.bettbox.receivers
+package io.github.jack4pear.bettboxplus.receivers
 
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.util.Log
-import com.appshub.bettbox.GlobalState
-import com.appshub.bettbox.RunState
+import io.github.jack4pear.bettboxplus.GlobalState
+import io.github.jack4pear.bettboxplus.RunState
 
 class PackageReplacedReceiver : BroadcastReceiver() {
     companion object {

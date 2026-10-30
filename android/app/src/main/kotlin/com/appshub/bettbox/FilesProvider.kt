@@ -1,4 +1,4 @@
-package com.appshub.bettbox
+package io.github.jack4pear.bettboxplus
 
 import android.database.Cursor
 import android.database.MatrixCursor

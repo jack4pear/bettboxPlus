@@ -39,7 +39,7 @@ class AboutView extends StatelessWidget {
         title: 'Github Releases',
         icon: Icons.star,
         onTap: () =>
-            globalState.openUrl('https://github.com/appshubcc/Bettbox'),
+            globalState.openUrl('https://github.com/jack4pear/bettboxPlus'),
       ),
       _LinkTile(
         title: appLocalizations.checkUpdate,

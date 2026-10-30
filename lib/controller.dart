@@ -472,7 +472,7 @@ class AppController {
       final profile = profiles
           .where((e) => e.id == currentProfileId)
           .firstOrNull;
-      final profileName = profile?.label ?? 'Bettbox';
+      final profileName = profile?.label ?? 'BettboxPlus';
       final speedInfo = traffic.toString();
       await vpn_service.service?.updateNotificationSpeed(
         profileName,
@@ -1209,7 +1209,7 @@ class AppController {
         return;
       }
       const String assetSuffix = String.fromEnvironment('APP_ASSET_SUFFIX');
-      String downloadUrl = 'https://github.com/$repository/releases/latest';
+      String downloadUrl = data['html_url'] as String? ?? 'https://github.com/$repository/releases';
 
       if (assetSuffix.isNotEmpty) {
         final versionWithoutV = tagName.startsWith('v')
@@ -1220,7 +1220,7 @@ class AppController {
           finalSuffix = 'windows-amd64-compatible-portable.zip';
         }
         downloadUrl =
-            'https://github.com/$repository/releases/download/$tagName/Bettbox-$versionWithoutV-$finalSuffix';
+            'https://github.com/$repository/releases/download/$tagName/BettboxPlus-$versionWithoutV-$finalSuffix';
       }
 
       globalState.openUrl(downloadUrl);
@@ -1908,7 +1908,7 @@ class AppController {
       final tempDir = Directory.systemTemp;
       final tempZipPath = join(
         tempDir.path,
-        'bettbox_backup_${DateTime.now().millisecondsSinceEpoch}.zip',
+        'bettboxplus_backup_${DateTime.now().millisecondsSinceEpoch}.zip',
       );
       final encoder = ZipFileEncoder(
         password: password.isEmpty ? null : password,
@@ -1917,7 +1917,7 @@ class AppController {
 
       // Add marker file
       final markerData = json.encode({
-        'app': 'Bettbox',
+        'app': 'BettboxPlus',
         'version': '1.0',
         'timestamp': DateTime.now().millisecondsSinceEpoch,
       });
@@ -1925,11 +1925,11 @@ class AppController {
       final tempMarkerFile = File(
         join(
           tempDir.path,
-          'bettbox_marker_${DateTime.now().millisecondsSinceEpoch}.tmp',
+          'bettboxplus_marker_${DateTime.now().millisecondsSinceEpoch}.tmp',
         ),
       );
       await tempMarkerFile.writeAsBytes(markerBytes);
-      await encoder.addFile(tempMarkerFile, '.bettbox_marker');
+      await encoder.addFile(tempMarkerFile, '.bettboxplus_marker');
       await tempMarkerFile.delete();
 
       // Add config file
@@ -1937,7 +1937,7 @@ class AppController {
       final tempConfigFile = File(
         join(
           tempDir.path,
-          'bettbox_config_${DateTime.now().millisecondsSinceEpoch}.tmp',
+          'bettboxplus_config_${DateTime.now().millisecondsSinceEpoch}.tmp',
         ),
       );
       await tempConfigFile.writeAsString(configStr);
@@ -2240,22 +2240,22 @@ class AppController {
 
     final homeDirPath = await appPath.homeDirPath;
 
-    // Check for Bettbox marker
-    final hasBettboxMarker = archive.files.any(
-      (file) => file.name == '.bettbox_marker',
+    // Check for BettboxPlus marker
+    final hasBettboxPlusMarker = archive.files.any(
+      (file) => file.name == '.bettboxplus_marker',
     );
 
-    if (hasBettboxMarker) {
-      // Bettbox backup
-      await _recoveryBettboxBackup(archive, recoveryOption, homeDirPath);
+    if (hasBettboxPlusMarker) {
+      // BettboxPlus backup
+      await _recoveryBettboxPlusBackup(archive, recoveryOption, homeDirPath);
     } else {
       // Legacy backup
       await _recoveryLegacyBackup(archive, recoveryOption, homeDirPath);
     }
   }
 
-  /// Restore Bettbox
-  Future<void> _recoveryBettboxBackup(
+  /// Restore BettboxPlus
+  Future<void> _recoveryBettboxPlusBackup(
     Archive archive,
     RecoveryOption recoveryOption,
     String homeDirPath,
@@ -2264,11 +2264,11 @@ class AppController {
     final configs = archive.files
         .where(
           (item) =>
-              item.name.endsWith('.json') && item.name != '.bettbox_marker',
+              item.name.endsWith('.json') && item.name != '.bettboxplus_marker',
         )
         .toList();
     final profiles = archive.files.where(
-      (item) => !item.name.endsWith('.json') && item.name != '.bettbox_marker',
+      (item) => !item.name.endsWith('.json') && item.name != '.bettboxplus_marker',
     );
 
     // Find config.json

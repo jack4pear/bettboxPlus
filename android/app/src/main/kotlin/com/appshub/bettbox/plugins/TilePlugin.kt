@@ -1,4 +1,4 @@
-package com.appshub.bettbox.plugins
+package io.github.jack4pear.bettboxplus.plugins
 
 import android.os.Handler
 import android.os.Looper

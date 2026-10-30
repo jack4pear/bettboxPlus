@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'release.dart';
+
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
 import 'package:intl/intl.dart';
@@ -32,7 +34,7 @@ class Request {
         client.autoUncompress = false;
         client.findProxy = (Uri uri) {
           client.userAgent = globalState.ua;
-          return BettboxHttpOverrides.handleFindProxy(uri);
+          return BettboxPlusHttpOverrides.handleFindProxy(uri);
         };
         return client;
       },
@@ -256,38 +258,20 @@ class Request {
 
   Future<Map<String, dynamic>?> checkForUpdate() async {
     try {
-      final t = DateTime.now().millisecondsSinceEpoch;
-      final response = await _dio.get(
-        'https://github.com/$repository/releases/latest?t=$t',
-        options: Options(
-          followRedirects: false,
-          validateStatus: (status) =>
-              status != null && status >= 300 && status < 400,
-        ),
+      // /releases/latest excludes prereleases; this fork starts on the pre channel.
+      final response = await _dio.get<List<dynamic>>(
+        'https://api.github.com/repos/$repository/releases',
+        queryParameters: {'per_page': 30},
       );
-      final location = response.headers['location']?.firstOrNull;
-      if (location != null && location.contains('/releases/tag/')) {
-        final remoteVersion = location.split('/').last.trim();
-        if (remoteVersion.isNotEmpty) {
-          final version = globalState.packageInfo.version;
-          final hasUpdate =
-              utils.compareVersions(
-                remoteVersion.replaceAll('v', ''),
-                version,
-              ) >
-              0;
-          if (!hasUpdate) return null;
-          return {
-            'tag_name': remoteVersion,
-            'html_url': 'https://github.com/$repository/releases/latest',
-            'body': 'New version available. Please visit GitHub to download.',
-          };
-        }
-      }
+      return selectBettboxPlusUpdate(
+        response.data ?? [],
+        globalState.packageInfo.version,
+        includePrerelease: globalState.isPre,
+      );
     } catch (e) {
       commonPrint.warn('Check update failed: ${e.formatErrorLog}');
+      return null;
     }
-    return null;
   }
 
   List<String> _getPrimaryIpSources() {

@@ -1,0 +1,1872 @@
+diff --git a/README.md b/README.md
+index 06b94a50..05f03799 100644
+--- a/README.md
++++ b/README.md
+@@ -1,26 +1,3 @@
+-# MihomoPlus
+-
+-基于 MetaCubeX/mihomo v1.19.33 的增强内核，新增可选的 Smart Fallback 熔断和恢复验证。
+-
+-- 开发源码分支：Meta。
+-- 使用说明：[Smart Fallback](docs/SMART-FALLBACK.md)。
+-- 示例配置：[YAML](docs/smart-fallback-example.yaml)。
+-- 验证记录：[本地验证](docs/VALIDATION.md)。
+-- 二进制发布：[Releases](https://github.com/jack4pear/mihomoPlus/releases)。
+-
+-功能默认关闭。开启后保留官方节点优先级，增加滑动窗口、递增冷却、连续恢复验证和稳定后重置。
+-选择与当前设备架构及指令集一致的构建文件，解压后替换内核；尚未完成 OpenWrt 实机验收。
+-
+-## GitHub 构建
+-
+-Meta 分支提交自动执行测试、竞态检查和本地故障注入。
+-推送 vX.Y.Z-smart.N 标签后，使用上游完整构建矩阵和压缩格式发布增强版预发布包。
+-也可在 Build 工作流中手动输入增强版本号；手动运行需要将仓库默认分支设为 Meta。
+-构建保留上游支持的平台、CPU 变体、兼容 Go 版本，以及 DEB/RPM/Pacman 包。
+-发布流程不覆盖分支，不访问 Docker Hub，也不通知上游仓库。
+-
+----
+-
+ <h1 align="center">
+   <img src="Meta.png" alt="Meta Kennel" width="200">
+   <br>Meta Kernel<br>
+diff --git a/adapter/adapter.go b/adapter/adapter.go
+index 81ab65c2..50efb034 100644
+--- a/adapter/adapter.go
++++ b/adapter/adapter.go
+@@ -173,6 +173,10 @@ func (p *Proxy) URLTest(ctx context.Context, url string, expectedStatus utils.In
+ func (p *Proxy) URLTestWithResult(ctx context.Context, url string, expectedStatus utils.IntRanges[uint16]) (t uint16, satisfied bool, err error) {
+ 
+ 	defer func() {
++		if UrlTestHook != nil {
++			UrlTestHook(url, p.Name(), t)
++		}
++
+ 		alive := err == nil
+ 		record := C.DelayHistory{Time: time.Now()}
+ 		if alive {
+@@ -273,7 +277,7 @@ func (p *Proxy) URLTestWithResult(ctx context.Context, url string, expectedStatu
+ 			start = second
+ 		} else {
+ 			if strings.HasPrefix(url, "http://") {
+-				log.Errorln("%s failed to get the second response from %s: %v", p.Name(), url, ignoredErr)
++				log.Warnln("%s failed to get the second response from %s: %v", p.Name(), url, ignoredErr)
+ 				log.Warnln("It is recommended to use HTTPS for provider.health-check.url and group.url to ensure better reliability. Due to some proxy providers hijacking test addresses and not being compatible with repeated HEAD requests, using HTTP may result in failed tests.")
+ 			}
+ 		}
+diff --git a/adapter/patch.go b/adapter/patch.go
+new file mode 100644
+index 00000000..4391c56b
+--- /dev/null
++++ b/adapter/patch.go
+@@ -0,0 +1,5 @@
++package adapter
++
++type UrlTestCheck func(url string, name string, delay uint16)
++
++var UrlTestHook UrlTestCheck
+diff --git a/adapter/provider/patch.go b/adapter/provider/patch.go
+new file mode 100644
+index 00000000..1f3306a6
+--- /dev/null
++++ b/adapter/provider/patch.go
+@@ -0,0 +1,5 @@
++package provider
++
++func (pp *proxySetProvider) GetSubscriptionInfo() *SubscriptionInfo {
++	return pp.subscriptionInfo
++}
+diff --git a/component/dialer/dialer.go b/component/dialer/dialer.go
+index 6a05c8bc..4a83eafe 100644
+--- a/component/dialer/dialer.go
++++ b/component/dialer/dialer.go
+@@ -86,7 +86,6 @@ func ListenPacket(ctx context.Context, network, address string, rAddrPort netip.
+ 	return lc.ListenPacket(ctx, network, address)
+ }
+ 
+-// Listen creates a TCP listener with the same socket policy as ListenPacket.
+ func Listen(ctx context.Context, network, address string, options ...Option) (net.Listener, error) {
+ 	lc, address, err := listenConfig(network, address, netip.AddrPort{}, applyOptions(options...))
+ 	if err != nil {
+@@ -100,7 +99,7 @@ func listenConfig(network, address string, rAddrPort netip.AddrPort, opt option)
+ 	if opt.addrReuse {
+ 		addrReuseToListenConfig(lc)
+ 	}
+-	if DefaultSocketHook != nil { // ignore interfaceName, routingMark when DefaultSocketHook not null (in CMFA)
++	if DefaultSocketHook != nil {
+ 		socketHookToListenConfig(lc)
+ 	} else {
+ 		if opt.interfaceName == "" {
+@@ -112,7 +111,6 @@ func listenConfig(network, address string, rAddrPort netip.AddrPort, opt option)
+ 			}
+ 		}
+ 		if rAddrPort.Addr().Unmap().IsLoopback() || listenAddressIsLoopback(address) {
+-			// avoid "The requested address is not valid in its context."
+ 			opt.interfaceName = ""
+ 		}
+ 		if opt.interfaceName != "" {
+diff --git a/component/iface/iface.go b/component/iface/iface.go
+index bbdabfea..c3807b76 100644
+--- a/component/iface/iface.go
++++ b/component/iface/iface.go
+@@ -4,6 +4,7 @@ import (
+ 	"errors"
+ 	"net"
+ 	"net/netip"
++	"sync"
+ 	"time"
+ 
+ 	"github.com/metacubex/mihomo/common/singledo"
+@@ -12,6 +13,13 @@ import (
+ 	"github.com/metacubex/bart"
+ )
+ 
++var (
++	ifaceLogMu         sync.Mutex
++	ifaceLogLastTime   time.Time
++	ifaceLogCount      int
++	ifaceLogSuppressed bool
++)
++
+ type Interface struct {
+ 	Index        int
+ 	MTU          int
+@@ -34,6 +42,30 @@ type ifaceCache struct {
+ 
+ var caches = singledo.NewSingle[*ifaceCache](time.Second * 20)
+ 
++func ShouldLogIfaceError() bool {
++	ifaceLogMu.Lock()
++	defer ifaceLogMu.Unlock()
++
++	now := time.Now()
++	if now.Sub(ifaceLogLastTime) >= time.Second {
++		ifaceLogLastTime = now
++		ifaceLogCount = 0
++		if ifaceLogSuppressed {
++			ifaceLogSuppressed = false
++			return true
++		}
++	}
++	if ifaceLogCount >= 10 {
++		if !ifaceLogSuppressed {
++			ifaceLogSuppressed = true
++			return true
++		}
++		return false
++	}
++	ifaceLogCount++
++	return true
++}
++
+ func getCache() (*ifaceCache, error) {
+ 	value, err, _ := caches.Do(func() (*ifaceCache, error) {
+ 		ifaces, err := anet.Interfaces()
+@@ -113,6 +145,9 @@ func ResolveInterface(name string) (*Interface, error) {
+ 
+ 	iface, ok := ifaces[name]
+ 	if !ok {
++		if ShouldLogIfaceError() {
++			return nil, ErrIfaceNotFound
++		}
+ 		return nil, ErrIfaceNotFound
+ 	}
+ 
+@@ -131,6 +166,9 @@ func ResolveInterfaceByAddr(addr netip.Addr) (*Interface, error) {
+ 	}
+ 	iface, ok := cache.ifTable.Lookup(addr)
+ 	if !ok {
++		if ShouldLogIfaceError() {
++			return nil, ErrIfaceNotFound
++		}
+ 		return nil, ErrIfaceNotFound
+ 	}
+ 
+diff --git a/component/loopback/detector.go b/component/loopback/detector.go
+index 59d16ca8..02f71373 100644
+--- a/component/loopback/detector.go
++++ b/component/loopback/detector.go
+@@ -17,7 +17,7 @@ import (
+ var disableLoopBackDetector, _ = strconv.ParseBool(os.Getenv("DISABLE_LOOPBACK_DETECTOR"))
+ 
+ func init() {
+-	if features.CMFA {
++	if features.Android {
+ 		disableLoopBackDetector = true
+ 	}
+ }
+diff --git a/component/resource/fetcher.go b/component/resource/fetcher.go
+index 464af2e7..2057aa22 100644
+--- a/component/resource/fetcher.go
++++ b/component/resource/fetcher.go
+@@ -195,6 +195,10 @@ func (f *Fetcher[V]) pullLoop(forceUpdate bool) {
+ 	for {
+ 		select {
+ 		case <-timer.C:
++			if forceUpdate {
++				log.Warnln("[Provider] %s not updated for a long time, force refresh", f.Name())
++				forceUpdate = false
++			}
+ 			f.updateWithLog()
+ 			interval := f.interval
+ 			if attempt := f.backoff.Attempt(); attempt > 0 { // f.Update() was failed, decrease the interval from backoff to achieve fast retry
+@@ -236,7 +240,7 @@ func (f *Fetcher[V]) updateCallback(path string) {
+ func (f *Fetcher[V]) updateWithLog() {
+ 	_, same, err := f.Update()
+ 	if err != nil {
+-		log.Errorln("[Provider] %s pull error: %s", f.Name(), err.Error())
++		log.Warnln("[Provider] %s pull error: %s", f.Name(), err.Error())
+ 		return
+ 	}
+ 
+diff --git a/component/tls/httpserver.go b/component/tls/httpserver.go
+new file mode 100644
+index 00000000..6a9426d9
+--- /dev/null
++++ b/component/tls/httpserver.go
+@@ -0,0 +1,69 @@
++package tls
++
++import (
++	"context"
++	"net"
++	"runtime/debug"
++	"time"
++
++	N "github.com/metacubex/mihomo/common/net"
++	"github.com/metacubex/mihomo/log"
++
++	"github.com/metacubex/http"
++)
++
++func extractTlsHandshakeTimeoutFromServer(s *http.Server) time.Duration {
++	var ret time.Duration
++	for _, v := range [...]time.Duration{
++		s.ReadHeaderTimeout,
++		s.ReadTimeout,
++		s.WriteTimeout,
++	} {
++		if v <= 0 {
++			continue
++		}
++		if ret == 0 || v < ret {
++			ret = v
++		}
++	}
++	return ret
++}
++
++// NewListenerForHttps returns a net.Listener for (*http.Server).Serve()
++// the "func (c *conn) serve(ctx context.Context)" in http\server.go
++// only do tls handshake and check NegotiatedProtocol with std's *tls.Conn
++// so we do the same logic to let http2 (not h2c) work fine
++func NewListenerForHttps(l net.Listener, httpServer *http.Server, tlsConfig *Config) net.Listener {
++	http2Server := &http.Http2Server{}
++	_ = http.Http2ConfigureServer(httpServer, http2Server)
++	return N.NewHandleContextListener(context.Background(), l, func(ctx context.Context, conn net.Conn) (net.Conn, error) {
++		c := Server(conn, tlsConfig)
++
++		tlsTO := extractTlsHandshakeTimeoutFromServer(httpServer)
++		if tlsTO > 0 {
++			dl := time.Now().Add(tlsTO)
++			_ = conn.SetReadDeadline(dl)
++			_ = conn.SetWriteDeadline(dl)
++		}
++
++		err := c.HandshakeContext(ctx)
++		if err != nil {
++			return nil, err
++		}
++
++		// Restore Conn-level deadlines.
++		if tlsTO > 0 {
++			_ = conn.SetReadDeadline(time.Time{})
++			_ = conn.SetWriteDeadline(time.Time{})
++		}
++
++		if c.ConnectionState().NegotiatedProtocol == http.Http2NextProtoTLS {
++			http2Server.ServeConn(c, &http.Http2ServeConnOpts{BaseConfig: httpServer})
++			return nil, net.ErrClosed
++		}
++		return c, nil
++	}, func(a any) {
++		stack := debug.Stack()
++		log.Errorln("https server panic: %s\n%s", a, stack)
++	})
++}
+diff --git a/component/updater/patch.go b/component/updater/patch.go
+new file mode 100644
+index 00000000..f6b04c23
+--- /dev/null
++++ b/component/updater/patch.go
+@@ -0,0 +1,79 @@
++package updater
++
++import (
++	"fmt"
++	"github.com/metacubex/mihomo/component/geodata"
++	"github.com/metacubex/mihomo/component/mmdb"
++	"github.com/oschwald/maxminddb-golang"
++)
++
++func UpdateMMDBWithPath(path string) (err error) {
++	defer mmdb.ReloadIP()
++	data, err := downloadForBytes(geodata.MmdbUrl())
++	if err != nil {
++		return fmt.Errorf("can't download MMDB database file: %w", err)
++	}
++	instance, err := maxminddb.FromBytes(data)
++	if err != nil {
++		return fmt.Errorf("invalid MMDB database file: %s", err)
++	}
++	_ = instance.Close()
++
++	mmdb.IPInstance().Reader.Close()
++	if err = saveFile(data, path); err != nil {
++		return fmt.Errorf("can't save MMDB database file: %w", err)
++	}
++	return nil
++}
++
++func UpdateASNWithPath(path string) (err error) {
++	defer mmdb.ReloadASN()
++	data, err := downloadForBytes(geodata.ASNUrl())
++	if err != nil {
++		return fmt.Errorf("can't download ASN database file: %w", err)
++	}
++
++	instance, err := maxminddb.FromBytes(data)
++	if err != nil {
++		return fmt.Errorf("invalid ASN database file: %s", err)
++	}
++	_ = instance.Close()
++
++	mmdb.ASNInstance().Reader.Close()
++	if err = saveFile(data, path); err != nil {
++		return fmt.Errorf("can't save ASN database file: %w", err)
++	}
++	return nil
++}
++
++func UpdateGeoIpWithPath(path string) (err error) {
++	geoLoader, err := geodata.GetGeoDataLoader("standard")
++	data, err := downloadForBytes(geodata.GeoIpUrl())
++	if err != nil {
++		return fmt.Errorf("can't download GeoIP database file: %w", err)
++	}
++	if _, err = geoLoader.LoadIPByBytes(data, "cn"); err != nil {
++		return fmt.Errorf("invalid GeoIP database file: %s", err)
++	}
++	if err = saveFile(data, path); err != nil {
++		return fmt.Errorf("can't save GeoIP database file: %w", err)
++	}
++	return nil
++}
++
++func UpdateGeoSiteWithPath(path string) (err error) {
++	geoLoader, err := geodata.GetGeoDataLoader("standard")
++	data, err := downloadForBytes(geodata.GeoSiteUrl())
++	if err != nil {
++		return fmt.Errorf("can't download GeoSite database file: %w", err)
++	}
++
++	if _, err = geoLoader.LoadSiteByBytes(data, "cn"); err != nil {
++		return fmt.Errorf("invalid GeoSite database file: %s", err)
++	}
++
++	if err = saveFile(data, path); err != nil {
++		return fmt.Errorf("can't save GeoSite database file: %w", err)
++	}
++	return nil
++}
+diff --git a/config/config.go b/config/config.go
+index cc8c1016..5c4dec54 100644
+--- a/config/config.go
++++ b/config/config.go
+@@ -501,7 +501,7 @@ func DefaultRawConfig() *RawConfig {
+ 		ProxyGroup:        []map[string]any{},
+ 		TCPConcurrent:     false,
+ 		FindProcessMode:   process.FindProcessStrict,
+-		GlobalUA:          "clash.meta/" + C.Version,
++		GlobalUA:          "FlClash/ClashMetaForAndroid/2.11.33.Bettbox",
+ 		ETagSupport:       true,
+ 		DNS: RawDNS{
+ 			Enable:         false,
+@@ -597,7 +597,7 @@ func DefaultRawConfig() *RawConfig {
+ 			ParsePureIp:     true,
+ 			OverrideDest:    true,
+ 		},
+-		ExternalUIURL: "https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.zip",
++		ExternalUIURL: "https://github.com/Zephyruso/zashboard/releases/latest/download/dist-no-fonts.zip",
+ 		ExternalControllerCors: RawCors{
+ 			AllowOrigins:        []string{"*"},
+ 			AllowPrivateNetwork: true,
+@@ -760,7 +760,7 @@ func temporaryUpdateGeneral(general *General) func()
+ 
+ func parseGeneral(cfg *RawConfig) (*General, error) {
+ 	if cfg.GlobalClientFingerprint != "" {
+-		log.Errorln("The `global-client-fingerprint` configuration is removed, please set `client-fingerprint` directly on the proxy instead")
++		log.Warnln("The `global-client-fingerprint` configuration is removed, please set `client-fingerprint` directly on the proxy instead")
+ 	}
+ 	return &General{
+ 		Inbound: Inbound{
+diff --git a/constant/adapters.go b/constant/adapters.go
+index 9b0b70ce..a44b2cdf 100644
+--- a/constant/adapters.go
++++ b/constant/adapters.go
+@@ -62,9 +62,10 @@ const (
+ 	DefaultUDPTimeout = dialer.DefaultUDPTimeout
+ 	DefaultDropTime   = 12 * DefaultTCPTimeout
+ 	DefaultTLSTimeout = DefaultTCPTimeout
+-	DefaultTestURL    = "https://www.gstatic.com/generate_204"
+ )
+ 
++var DefaultTestURL = "https://www.gstatic.com/generate_204"
++
+ var ErrNotSupport = errors.New("no support")
+ 
+ type Connection interface {
+@@ -304,6 +305,17 @@ func (s *packetAdapter) Key() string {
+ 	return s.key
+ }
+ 
++type PacketRejector interface {
++	Reject() error
++}
++
++func (s *packetAdapter) Reject() error {
++	if rejector, ok := s.UDPPacket.(PacketRejector); ok {
++		return rejector.Reject()
++	}
++	return nil
++}
++
+ func NewPacketAdapter(packet UDPPacket, metadata *Metadata) PacketAdapter {
+ 	return &packetAdapter{
+ 		packet,
+diff --git a/constant/features/android.go b/constant/features/android.go
+new file mode 100644
+index 00000000..c1174f08
+--- /dev/null
++++ b/constant/features/android.go
+@@ -0,0 +1,5 @@
++//go:build android
++
++package features
++
++const Android = true
+diff --git a/constant/features/android_stub.go b/constant/features/android_stub.go
+new file mode 100644
+index 00000000..282493e7
+--- /dev/null
++++ b/constant/features/android_stub.go
+@@ -0,0 +1,5 @@
++//go:build !android
++
++package features
++
++const Android = false
+diff --git a/constant/features/cmfa.go b/constant/features/cmfa.go
+deleted file mode 100644
+index 9a81d82f..00000000
+--- a/constant/features/cmfa.go
++++ /dev/null
+@@ -1,5 +0,0 @@
+-//go:build cmfa
+-
+-package features
+-
+-const CMFA = true
+diff --git a/constant/features/cmfa_stub.go b/constant/features/cmfa_stub.go
+deleted file mode 100644
+index f7ef0827..00000000
+--- a/constant/features/cmfa_stub.go
++++ /dev/null
+@@ -1,5 +0,0 @@
+-//go:build !cmfa
+-
+-package features
+-
+-const CMFA = false
+diff --git a/constant/features/tags.go b/constant/features/tags.go
+index bf27c248..4c90ac28 100644
+--- a/constant/features/tags.go
++++ b/constant/features/tags.go
+@@ -1,9 +1,6 @@
+ package features
+ 
+ func Tags() (tags []string) {
+-	if CMFA {
+-		tags = append(tags, "cmfa")
+-	}
+ 	if WithLowMemory {
+ 		tags = append(tags, "with_low_memory")
+ 	}
+diff --git a/constant/path.go b/constant/path.go
+index f2463a4a..425a69c5 100644
+--- a/constant/path.go
++++ b/constant/path.go
+@@ -86,7 +86,7 @@ func (p *path) Resolve(path string) string {
+ 
+ // IsSafePath return true if path is a subpath of homedir (or in the SAFE_PATHS environment variable)
+ func (p *path) IsSafePath(path string) bool {
+-	if p.allowUnsafePath || features.CMFA {
++	if p.allowUnsafePath || features.Android {
+ 		return true
+ 	}
+ 	path = p.Resolve(path)
+diff --git a/constant/version.go b/constant/version.go
+index c71024c2..4daa9669 100644
+--- a/constant/version.go
++++ b/constant/version.go
+@@ -2,7 +2,7 @@ package constant
+ 
+ var (
+ 	Meta       = true
+-	Version    = "1.10.0"
++	Version    = "v1.19.33-smart.1+3803eebbdb4ac3e92d39b1104e1c5ae668c2b18f"
+ 	BuildTime  = "unknown time"
+-	MihomoName = "mihomo"
++	MihomoName = "mihomoPlus"
+ )
+diff --git a/dns/doh.go b/dns/doh.go
+index b56d8ffd..56de842b 100644
+--- a/dns/doh.go
++++ b/dns/doh.go
+@@ -36,9 +36,9 @@ const (
+ 	// connections in HTTP transport.
+ 	transportDefaultIdleConnTimeout = 5 * time.Minute
+ 
+-	dialTimeout        = 10 * time.Second
++	dialTimeout = 10 * time.Second
+ 
+-	maxElapsedTime  = time.Second * 30
++	maxElapsedTime = time.Second * 30
+ )
+ 
+ var DefaultHTTPVersions = []C.HTTPVersion{C.HTTPVersion11, C.HTTPVersion2}
+diff --git a/dns/patch_android.go b/dns/patch_android.go
+index cad718b6..138e95d5 100644
+--- a/dns/patch_android.go
++++ b/dns/patch_android.go
+@@ -1,4 +1,4 @@
+-//go:build android && cmfa
++//go:build android
+ 
+ package dns
+ 
+diff --git a/dns/system_common.go b/dns/system_common.go
+index e6dabdcf..78c4a86f 100644
+--- a/dns/system_common.go
++++ b/dns/system_common.go
+@@ -1,4 +1,4 @@
+-//go:build !(android && cmfa)
++//go:build !android
+ 
+ package dns
+ 
+diff --git a/docs/VALIDATION.md b/docs/VALIDATION.md
+index c80a4f15..03552b67 100644
+--- a/docs/VALIDATION.md
++++ b/docs/VALIDATION.md
+@@ -36,7 +36,7 @@
+ 使用上游正式版附带的 MetaCubeX Go 1.26.10，工具链归档 SHA256 已校验，通过 mise 调用。
+ Linux amd64 使用 GOAMD64=v1；Linux arm64 为交叉编译。两个文件均为静态链接 ELF，带 with_gvisor。
+ 版本为 v1.19.33-smart.1，详细构建参数见 BUILD-INFO.txt。
+-本记录对应首次本地交付，源码快照及校验清单随当时交付包提供。后续提交与 GitHub CI 结果以仓库历史和 Actions 页面为准。
++源码快照及校验清单随交付包提供；工作目录保留未提交改动，没有自动提交、发布或部署。
+ 
+ 尚未做 OpenWrt、OpenClash 或 Nikki 实机验收。
+ HTTP 健康检查不验证 UDP/QUIC 业务通路；已有会话不自动迁移。
+diff --git a/docs/logo.png b/docs/logo.png
+old mode 100755
+new mode 100644
+diff --git a/go.sum b/go.sum
+index e42e954f..136d9eae 100644
+--- a/go.sum
++++ b/go.sum
+@@ -328,4 +328,4 @@ golang.org/x/xerrors v0.0.0-20191011141410-1b5146add898/go.mod h1:I/5z698sn9Ka8T
+ gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
+ gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
+ gopkg.in/yaml.v3 v3.0.1/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
+-software.sslmate.com/src/go-pkcs12 v0.4.0 h1:H2g08FrTvSFKUj+D309j1DPfk5APnIdAQAB8aEykJ5k=
++software.sslmate.com/src/go-pkcs12 v0.4.0 h1:H2g08FrTvSFKUj+D309j1DPfk5APnIdAQAB8aEykJ5k=
+\ No newline at end of file
+diff --git a/hub/executor/executor.go b/hub/executor/executor.go
+index 796face2..d848bbcc 100644
+--- a/hub/executor/executor.go
++++ b/hub/executor/executor.go
+@@ -104,8 +104,8 @@ func ApplyConfig(cfg *config.Config, force bool) {
+ 	updateGeneral(cfg.General, true)
+ 	updateDNS(cfg.DNS, cfg.General.IPv6)
+ 	updateNTP(cfg.NTP) // initialize NTP after DNS because an NTP server may be a hostname.
+-	updateListeners(cfg.General, cfg.Listeners, force)
+-	updateTun(cfg.General) // tun should not care "force"
++	// updateListeners(cfg.General, cfg.Listeners, force)
++	// updateTun(cfg.General) // tun should not care "force"
+ 	updateIPTables(cfg)
+ 	updateTunnels(cfg.Tunnels)
+ 
+@@ -462,6 +462,12 @@ func patchSelectGroup(proxies map[string]C.Proxy) {
+ 			continue
+ 		}
+ 
++		if outbound.Type() == C.URLTest {
++			cachefile.Cache().SetSelected(name, "")
++			selector.ForceSet("")
++			continue
++		}
++
+ 		selector.ForceSet(selected)
+ 	}
+ }
+diff --git a/hub/executor/patch.go b/hub/executor/patch.go
+new file mode 100644
+index 00000000..1cbbbbc0
+--- /dev/null
++++ b/hub/executor/patch.go
+@@ -0,0 +1,5 @@
++package executor
++
++type ProviderLoadedHook func(providerName string)
++
++var DefaultProviderLoadedHook ProviderLoadedHook
+diff --git a/hub/route/patch_android.go b/hub/route/patch_android.go
+index 5eba2796..4b6dcf25 100644
+--- a/hub/route/patch_android.go
++++ b/hub/route/patch_android.go
+@@ -1,4 +1,4 @@
+-//go:build android && cmfa
++//go:build android
+ 
+ package route
+ 
+diff --git a/hub/route/restart.go b/hub/route/restart.go
+index 89a95be9..2d83df6c 100644
+--- a/hub/route/restart.go
++++ b/hub/route/restart.go
+@@ -17,7 +17,10 @@ import (
+ 
+ func restartRouter() http.Handler {
+ 	r := chi.NewRouter()
+-	r.Post("/", restart)
++	r.Post("/", func(w http.ResponseWriter, r *http.Request) {
++		render.Status(r, http.StatusForbidden)
++		render.JSON(w, r, newError("Not supported"))
++	})
+ 	return r
+ }
+ 
+diff --git a/hub/route/server.go b/hub/route/server.go
+index 6d37d480..b1659cd0 100644
+--- a/hub/route/server.go
++++ b/hub/route/server.go
+@@ -181,9 +181,7 @@ func start(cfg *Config) {
+ 			Handler: router(cfg.IsDebug, cfg.Secret, cfg.DohServer, cfg.Cors),
+ 		}
+ 		httpServer = server
+-		if err = server.Serve(l); err != nil {
+-			log.Errorln("External controller serve error: %s", err)
+-		}
++		_ = server.Serve(l)
+ 	}
+ }
+ 
+diff --git a/hub/route/upgrade.go b/hub/route/upgrade.go
+index b3593669..78754f72 100644
+--- a/hub/route/upgrade.go
++++ b/hub/route/upgrade.go
+@@ -15,8 +15,11 @@ import (
+ func upgradeRouter() http.Handler {
+ 	r := chi.NewRouter()
+ 	r.Post("/ui", updateUI)
+-	if !embedMode { // disallow upgrade core/geo in embed mode
+-		r.Post("/", upgradeCore)
++	r.Post("/", func(w http.ResponseWriter, r *http.Request) {
++		render.Status(r, http.StatusForbidden)
++		render.JSON(w, r, newError("Not supported"))
++	})
++	if !embedMode {
+ 		r.Post("/geo", updateGeoDatabases)
+ 	}
+ 	return r
+diff --git a/listener/http/patch_android.go b/listener/http/patch_android.go
+new file mode 100644
+index 00000000..a763c95e
+--- /dev/null
++++ b/listener/http/patch_android.go
+@@ -0,0 +1,9 @@
++//go:build android
++
++package http
++
++import "net"
++
++func (l *Listener) Listener() net.Listener {
++	return l.listener
++}
+diff --git a/listener/mieru/server.go b/listener/mieru/server.go
+index 2bdd0812..e9507434 100644
+--- a/listener/mieru/server.go
++++ b/listener/mieru/server.go
+@@ -29,7 +29,7 @@ func Handle(conn net.Conn, tunnel C.Tunnel, request *mierumodel.Request, additio
+ 		conn.Close()
+ 		return
+ 	}
+-	user := conn.(mierucommon.UserContext).UserName()
++
+ 	// Handle the connection with tunnel.
+ 	switch request.Command {
+ 	case mieruconstant.Socks5ConnectCmd: // TCP
+@@ -46,14 +46,13 @@ func Handle(conn net.Conn, tunnel C.Tunnel, request *mierumodel.Request, additio
+ 		}
+ 		inbound.ApplyAdditions(
+ 			metadata,
+-			inbound.WithInUser(user),
++			inbound.WithInName(conn.(mierucommon.UserContext).UserName()),
+ 			inbound.WithSrcAddr(conn.RemoteAddr()),
+ 			inbound.WithInAddr(conn.LocalAddr()),
+ 		)
+ 		inbound.ApplyAdditions(metadata, additions...)
+ 		tunnel.HandleTCPConn(conn, metadata)
+ 	case mieruconstant.Socks5UDPAssociateCmd: // UDP
+-		additions = append(additions, inbound.WithInUser(user))
+ 		pc := mierucommon.NewPacketOverStreamTunnel(conn)
+ 		ep := N.NewEnhancePacketConn(pc)
+ 		defer ep.Close()
+diff --git a/listener/patch.go b/listener/patch.go
+new file mode 100644
+index 00000000..6ab5aa11
+--- /dev/null
++++ b/listener/patch.go
+@@ -0,0 +1,74 @@
++package listener
++
++func StopListener() {
++
++	if socksListener != nil {
++		_ = socksListener.Close()
++		socksListener = nil
++	}
++
++	if socksUDPListener != nil {
++		_ = socksUDPListener.Close()
++		socksUDPListener = nil
++	}
++
++	if httpListener != nil {
++		_ = httpListener.Close()
++		httpListener = nil
++	}
++
++	if redirListener != nil {
++		_ = redirListener.Close()
++		redirListener = nil
++	}
++
++	if redirUDPListener != nil {
++		_ = redirUDPListener.Close()
++		redirUDPListener = nil
++	}
++
++	if tproxyListener != nil {
++		_ = tproxyListener.Close()
++		tproxyListener = nil
++	}
++
++	if tproxyUDPListener != nil {
++		_ = tproxyUDPListener.Close()
++		tproxyUDPListener = nil
++	}
++
++	if mixedListener != nil {
++		_ = mixedListener.Close()
++		mixedListener = nil
++	}
++
++	if mixedUDPLister != nil {
++		_ = mixedUDPLister.Close()
++		mixedUDPLister = nil
++	}
++
++	if tunLister != nil {
++		_ = tunLister.Close()
++		tunLister = nil
++	}
++
++	if shadowSocksListener != nil {
++		_ = shadowSocksListener.Close()
++		shadowSocksListener = nil
++	}
++
++	if shadowSocksListener != nil {
++		_ = shadowSocksListener.Close()
++		shadowSocksListener = nil
++	}
++
++	if vmessListener != nil {
++		_ = vmessListener.Close()
++		vmessListener = nil
++	}
++
++	if tuicListener != nil {
++		_ = tuicListener.Close()
++		tuicListener = nil
++	}
++}
+diff --git a/listener/sing/sing.go b/listener/sing/sing.go
+index 7bb74173..59192e30 100644
+--- a/listener/sing/sing.go
++++ b/listener/sing/sing.go
+@@ -213,19 +213,24 @@ type localAddr interface {
+ }
+ 
+ func (h *ListenerHandler) NewPacket(ctx context.Context, key netip.AddrPort, buffer *buf.Buffer, metadata M.Metadata, init func(natConn network.PacketConn) network.PacketWriter) {
++	h.NewPacketWithRejecter(ctx, key, buffer, metadata, init, nil)
++}
++
++func (h *ListenerHandler) NewPacketWithRejecter(ctx context.Context, key netip.AddrPort, buffer *buf.Buffer, metadata M.Metadata, init func(natConn network.PacketConn) network.PacketWriter, rejecter func() error) {
+ 	writer := bufio.NewNetPacketWriter(init(nil))
+ 	mutex := sync.Mutex{}
+ 	cPacket := &packet{
+-		writer: &writer,
+-		mutex:  &mutex,
+-		rAddr:  metadata.Source.UDPAddr(),
+-		buff:   buffer,
++		writer:   &writer,
++		mutex:    &mutex,
++		rAddr:    metadata.Source.UDPAddr(),
++		buff:     buffer,
++		rejecter: rejecter,
+ 	}
+-	if h.Type != C.TUN { // make the handler-related SNAT key for not TUN listener
++	if h.Type != C.TUN {
+ 		connID := fmt.Sprintf("%s:%s", h.handlerId, key)
+-		cPacket.rAddr = N.NewCustomAddr(h.Type.String(), connID, cPacket.rAddr) // for tunnel's handleUDPConn
++		cPacket.rAddr = N.NewCustomAddr(h.Type.String(), connID, cPacket.rAddr)
+ 	}
+-	if conn, ok := common.Cast[localAddr](writer); ok { // tun does not have real inAddr
++	if conn, ok := common.Cast[localAddr](writer); ok {
+ 		cPacket.lAddr = conn.LocalAddr()
+ 	}
+ 	h.handlePacket(ctx, cPacket, metadata.Source, metadata.Destination)
+@@ -268,11 +273,19 @@ func ShouldIgnorePacketError(err error) bool {
+ }
+ 
+ type packet struct {
+-	writer *network.NetPacketWriter
+-	mutex  *sync.Mutex
+-	rAddr  net.Addr
+-	lAddr  net.Addr
+-	buff   *buf.Buffer
++	writer   *network.NetPacketWriter
++	mutex    *sync.Mutex
++	rAddr    net.Addr
++	lAddr    net.Addr
++	buff     *buf.Buffer
++	rejecter func() error
++}
++
++func (c *packet) Reject() error {
++	if c.rejecter != nil {
++		return c.rejecter()
++	}
++	return nil
+ }
+ 
+ func (c *packet) Data() []byte {
+diff --git a/listener/sing_tun/dns.go b/listener/sing_tun/dns.go
+index 3ae3981d..9616885c 100644
+--- a/listener/sing_tun/dns.go
++++ b/listener/sing_tun/dns.go
+@@ -47,7 +47,16 @@ func (h *ListenerHandler) NewPacket(ctx context.Context, key netip.AddrPort, buf
+ 		go relayDnsPacket(ctx, buffer, rwOptions, metadata.Destination, nil, &writer)
+ 		return
+ 	}
+-	h.ListenerHandler.NewPacket(ctx, key, buffer, metadata, init)
++	var rejecter func() error
++	if h.tunIf != nil {
++		srcAddr := metadata.Source.AddrPort()
++		dstAddr := metadata.Destination.AddrPort()
++		payloadLen := buffer.Len()
++		rejecter = func() error {
++			return sendICMPUnreachable(h.tunIf, srcAddr, dstAddr, payloadLen)
++		}
++	}
++	h.ListenerHandler.NewPacketWithRejecter(ctx, key, buffer, metadata, init, rejecter)
+ }
+ 
+ func (h *ListenerHandler) NewPacketConnection(ctx context.Context, conn network.PacketConn, metadata M.Metadata) error {
+diff --git a/listener/sing_tun/reject.go b/listener/sing_tun/reject.go
+new file mode 100644
+index 00000000..fd32e970
+--- /dev/null
++++ b/listener/sing_tun/reject.go
+@@ -0,0 +1,105 @@
++package sing_tun
++
++import (
++	"encoding/binary"
++	"io"
++	"net/netip"
++)
++
++func sendICMPUnreachable(writer io.Writer, srcAddr, dstAddr netip.AddrPort, payloadLen int) error {
++	if writer == nil {
++		return nil
++	}
++	var pkt []byte
++	if srcAddr.Addr().Is4() && dstAddr.Addr().Is4() {
++		pkt = buildICMPUnreachableIPv4(srcAddr, dstAddr, payloadLen)
++	} else if srcAddr.Addr().Is6() && dstAddr.Addr().Is6() {
++		pkt = buildICMPUnreachableIPv6(srcAddr, dstAddr, payloadLen)
++	} else {
++		return nil
++	}
++	_, err := writer.Write(pkt)
++	return err
++}
++
++func buildICMPUnreachableIPv4(srcAddr, dstAddr netip.AddrPort, payloadLen int) []byte {
++	pkt := make([]byte, 56)
++	pkt[0] = 0x45
++	binary.BigEndian.PutUint16(pkt[2:4], 56)
++	binary.BigEndian.PutUint16(pkt[6:8], 0x4000)
++	pkt[8] = 64
++	pkt[9] = 1
++
++	srcIP := dstAddr.Addr().As4()
++	dstIP := srcAddr.Addr().As4()
++	copy(pkt[12:16], srcIP[:])
++	copy(pkt[16:20], dstIP[:])
++	binary.BigEndian.PutUint16(pkt[10:12], checksum(0, pkt[:20]))
++
++	icmpMsg := pkt[20:56]
++	icmpMsg[0] = 3
++	icmpMsg[1] = 3
++
++	origIPHdr := icmpMsg[8:28]
++	origIPHdr[0] = 0x45
++	binary.BigEndian.PutUint16(origIPHdr[2:4], uint16(28+payloadLen))
++	binary.BigEndian.PutUint16(origIPHdr[6:8], 0x4000)
++	origIPHdr[8] = 64
++	origIPHdr[9] = 17
++	copy(origIPHdr[12:16], dstIP[:])
++	copy(origIPHdr[16:20], srcIP[:])
++	binary.BigEndian.PutUint16(origIPHdr[10:12], checksum(0, origIPHdr))
++
++	binary.BigEndian.PutUint16(pkt[48:50], srcAddr.Port())
++	binary.BigEndian.PutUint16(pkt[50:52], dstAddr.Port())
++	binary.BigEndian.PutUint16(pkt[52:54], uint16(8+payloadLen))
++
++	binary.BigEndian.PutUint16(icmpMsg[2:4], checksum(0, icmpMsg))
++	return pkt
++}
++
++func buildICMPUnreachableIPv6(srcAddr, dstAddr netip.AddrPort, payloadLen int) []byte {
++	pkt := make([]byte, 96)
++	pkt[0] = 0x60
++	binary.BigEndian.PutUint16(pkt[4:6], 56)
++	pkt[6] = 58
++	pkt[7] = 64
++
++	srcIP := dstAddr.Addr().As16()
++	dstIP := srcAddr.Addr().As16()
++	copy(pkt[8:24], srcIP[:])
++	copy(pkt[24:40], dstIP[:])
++
++	icmpMsg := pkt[40:96]
++	icmpMsg[0] = 1
++	icmpMsg[1] = 4
++
++	origIPHdr := icmpMsg[8:48]
++	origIPHdr[0] = 0x60
++	binary.BigEndian.PutUint16(origIPHdr[4:6], uint16(8+payloadLen))
++	origIPHdr[6] = 17
++	origIPHdr[7] = 64
++	copy(origIPHdr[8:24], dstIP[:])
++	copy(origIPHdr[24:40], srcIP[:])
++
++	binary.BigEndian.PutUint16(pkt[88:90], srcAddr.Port())
++	binary.BigEndian.PutUint16(pkt[90:92], dstAddr.Port())
++	binary.BigEndian.PutUint16(pkt[92:94], uint16(8+payloadLen))
++
++	binary.BigEndian.PutUint16(icmpMsg[2:4], checksum(uint32(len(icmpMsg)+58), pkt[8:]))
++	return pkt
++}
++
++func checksum(sum uint32, b []byte) uint16 {
++	for i := 0; i < len(b)-1; i += 2 {
++		sum += uint32(binary.BigEndian.Uint16(b[i : i+2]))
++	}
++	if len(b)%2 == 1 {
++		sum += uint32(b[len(b)-1]) << 8
++	}
++	for sum > 0xffff {
++		sum = (sum & 0xffff) + (sum >> 16)
++	}
++	return ^uint16(sum)
++}
++
+diff --git a/listener/sing_tun/reject_test.go b/listener/sing_tun/reject_test.go
+new file mode 100644
+index 00000000..e279ec74
+--- /dev/null
++++ b/listener/sing_tun/reject_test.go
+@@ -0,0 +1,77 @@
++package sing_tun
++
++import (
++	"bytes"
++	"encoding/binary"
++	"net/netip"
++	"testing"
++)
++
++func TestBuildICMPUnreachableIPv4(t *testing.T) {
++	src := netip.MustParseAddrPort("198.18.0.1:54321")
++	dst := netip.MustParseAddrPort("198.18.0.2:443")
++	pkt := buildICMPUnreachableIPv4(src, dst, 100)
++
++	if len(pkt) != 56 {
++		t.Fatalf("expected 56 bytes, got %d", len(pkt))
++	}
++	if pkt[0] != 0x45 {
++		t.Errorf("expected IPv4 version 4, got 0x%x", pkt[0])
++	}
++	if pkt[9] != 1 {
++		t.Errorf("expected protocol ICMP(1), got %d", pkt[9])
++	}
++	if pkt[20] != 3 || pkt[21] != 3 {
++		t.Errorf("expected ICMP type 3 code 3, got type %d code %d", pkt[20], pkt[21])
++	}
++	if binary.BigEndian.Uint16(pkt[48:50]) != 54321 {
++		t.Errorf("expected orig src port 54321, got %d", binary.BigEndian.Uint16(pkt[48:50]))
++	}
++	if binary.BigEndian.Uint16(pkt[50:52]) != 443 {
++		t.Errorf("expected orig dst port 443, got %d", binary.BigEndian.Uint16(pkt[50:52]))
++	}
++	if c := checksum(0, pkt[:20]); c != 0 {
++		t.Errorf("ip checksum verification failed, got 0x%x", c)
++	}
++	if c := checksum(0, pkt[20:56]); c != 0 {
++		t.Errorf("icmp checksum verification failed, got 0x%x", c)
++	}
++}
++
++func TestBuildICMPUnreachableIPv6(t *testing.T) {
++	src := netip.MustParseAddrPort("[fd00::1]:54321")
++	dst := netip.MustParseAddrPort("[fd00::2]:443")
++	pkt := buildICMPUnreachableIPv6(src, dst, 100)
++
++	if len(pkt) != 96 {
++		t.Fatalf("expected 96 bytes, got %d", len(pkt))
++	}
++	if pkt[0] != 0x60 {
++		t.Errorf("expected IPv6 version 6, got 0x%x", pkt[0])
++	}
++	if pkt[6] != 58 {
++		t.Errorf("expected next header ICMPv6(58), got %d", pkt[6])
++	}
++	if pkt[40] != 1 || pkt[41] != 4 {
++		t.Errorf("expected ICMPv6 type 1 code 4, got type %d code %d", pkt[40], pkt[41])
++	}
++	if binary.BigEndian.Uint16(pkt[88:90]) != 54321 {
++		t.Errorf("expected orig src port 54321, got %d", binary.BigEndian.Uint16(pkt[88:90]))
++	}
++	if binary.BigEndian.Uint16(pkt[90:92]) != 443 {
++		t.Errorf("expected orig dst port 443, got %d", binary.BigEndian.Uint16(pkt[90:92]))
++	}
++}
++
++func TestSendICMPUnreachable(t *testing.T) {
++	var buf bytes.Buffer
++	src := netip.MustParseAddrPort("198.18.0.1:12345")
++	dst := netip.MustParseAddrPort("198.18.0.2:443")
++	err := sendICMPUnreachable(&buf, src, dst, 64)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if buf.Len() != 56 {
++		t.Fatalf("expected 56 bytes written, got %d", buf.Len())
++	}
++}
+diff --git a/listener/sing_tun/server.go b/listener/sing_tun/server.go
+index 5415b25e..34b5ab81 100644
+--- a/listener/sing_tun/server.go
++++ b/listener/sing_tun/server.go
+@@ -39,6 +39,28 @@ import (
+ var InterfaceName = "Meta"
+ var EnforceBindInterface = false
+ 
++var (
++	tunLogMu       sync.Mutex
++	tunLogLastTime time.Time
++	tunLogCount    int
++)
++
++func shouldLogTun() bool {
++	tunLogMu.Lock()
++	defer tunLogMu.Unlock()
++
++	now := time.Now()
++	if now.Sub(tunLogLastTime) >= time.Second {
++		tunLogLastTime = now
++		tunLogCount = 0
++	}
++	if tunLogCount >= 10 {
++		return false
++	}
++	tunLogCount++
++	return true
++}
++
+ type Listener struct {
+ 	closed  bool
+ 	options LC.Tun
+@@ -73,6 +95,7 @@ type ListenerHandler struct {
+ 	Inet4Address          []netip.Prefix
+ 	Inet6Address          []netip.Prefix
+ 	DisableICMPForwarding bool
++	tunIf                 tun.Tun
+ }
+ 
+ var emptyAddressSet = []*netipx.IPSet{{}}
+@@ -478,11 +501,6 @@ func New(options LC.Tun, tunnel C.Tunnel, additions ...inbound.Addition) (l *Lis
+ 
+ 	}
+ 
+-	err = l.buildAndroidRules(&tunOptions)
+-	if err != nil {
+-		err = E.Cause(err, "build android rules")
+-		return
+-	}
+ 	tunIf, err := tunNew(tunOptions)
+ 	if err != nil {
+ 		err = E.Cause(err, "configure tun interface")
+@@ -508,6 +526,7 @@ func New(options LC.Tun, tunnel C.Tunnel, additions ...inbound.Addition) (l *Lis
+ 		EnforceBindInterface:   EnforceBindInterface,
+ 	}
+ 	l.tunIf = tunIf
++	handler.tunIf = tunIf
+ 
+ 	tunStack, err := tun.NewStack(strings.ToLower(options.Stack.String()), stackOptions)
+ 	if err != nil {
+@@ -630,15 +649,21 @@ func (d *cDialerInterfaceFinder) FindInterfaceName(destination netip.Addr) strin
+ 	for _, dest := range []netip.Addr{destination, netip.IPv4Unspecified(), netip.IPv6Unspecified()} {
+ 		autoDetectInterfaceName := d.DefaultInterfaceName(dest)
+ 		if autoDetectInterfaceName == d.tunName {
+-			log.Warnln("[TUN] Auto detect interface for %s get same name with tun", destination.String())
++			if shouldLogTun() {
++				log.Warnln("[TUN] Auto detect interface for %s get same name with tun", destination.String())
++			}
+ 		} else if autoDetectInterfaceName == "" || autoDetectInterfaceName == "<nil>" {
+-			log.Warnln("[TUN] Auto detect interface for %s get empty name.", destination.String())
++			if shouldLogTun() {
++				log.Warnln("[TUN] Auto detect interface for %s get empty name.", destination.String())
++			}
+ 		} else {
+ 			log.Debugln("[TUN] Auto detect interface for %s --> %s", destination, autoDetectInterfaceName)
+ 			return autoDetectInterfaceName
+ 		}
+ 	}
+-	log.Warnln("[TUN] Auto detect interface for %s failed, return '<invalid>' to avoid lookback", destination)
++	if shouldLogTun() {
++		log.Warnln("[TUN] Auto detect interface for %s failed, return '<invalid>' to avoid lookback", destination)
++	}
+ 	return "<invalid>"
+ }
+ 
+diff --git a/listener/sing_tun/server_android.go b/listener/sing_tun/server_android.go
+deleted file mode 100644
+index f180bd30..00000000
+--- a/listener/sing_tun/server_android.go
++++ /dev/null
+@@ -1,77 +0,0 @@
+-//go:build android && !cmfa
+-
+-package sing_tun
+-
+-import (
+-	"errors"
+-	"sync"
+-
+-	"github.com/metacubex/mihomo/component/process"
+-	"github.com/metacubex/mihomo/constant"
+-	"github.com/metacubex/mihomo/constant/features"
+-	"github.com/metacubex/mihomo/log"
+-
+-	"github.com/metacubex/sing-tun"
+-)
+-
+-type packageManagerCallback struct{}
+-
+-func (cb *packageManagerCallback) OnPackagesUpdated(packageCount int, sharedCount int) {}
+-
+-func newPackageManager() (tun.PackageManager, error) {
+-	packageManager, err := tun.NewPackageManager(tun.PackageManagerOptions{
+-		Callback: &packageManagerCallback{},
+-		Logger:   log.SingLogger,
+-	})
+-	if err != nil {
+-		return nil, err
+-	}
+-	err = packageManager.Start()
+-	if err != nil {
+-		return nil, err
+-	}
+-	return packageManager, nil
+-}
+-
+-var (
+-	globalPM tun.PackageManager
+-	pmOnce   sync.Once
+-	pmErr    error
+-)
+-
+-func getPackageManager() (tun.PackageManager, error) {
+-	pmOnce.Do(func() {
+-		globalPM, pmErr = newPackageManager()
+-	})
+-	return globalPM, pmErr
+-}
+-
+-func (l *Listener) buildAndroidRules(tunOptions *tun.Options) error {
+-	packageManager, err := getPackageManager()
+-	if err != nil {
+-		return err
+-	}
+-	tunOptions.BuildAndroidRules(packageManager, l.handler)
+-	return nil
+-}
+-
+-func findPackageName(metadata *constant.Metadata) (string, error) {
+-	packageManager, err := getPackageManager()
+-	if err != nil {
+-		return "", err
+-	}
+-	uid := metadata.Uid
+-	if sharedPackage, loaded := packageManager.SharedPackageByID(uid % 100000); loaded {
+-		return sharedPackage, nil
+-	}
+-	if packageName, loaded := packageManager.PackageByID(uid % 100000); loaded {
+-		return packageName, nil
+-	}
+-	return "", errors.New("package not found")
+-}
+-
+-func init() {
+-	if !features.CMFA {
+-		process.DefaultPackageNameResolver = findPackageName
+-	}
+-}
+diff --git a/listener/sing_tun/server_notandroid.go b/listener/sing_tun/server_notandroid.go
+deleted file mode 100644
+index e393d4ca..00000000
+--- a/listener/sing_tun/server_notandroid.go
++++ /dev/null
+@@ -1,11 +0,0 @@
+-//go:build !android || cmfa
+-
+-package sing_tun
+-
+-import (
+-	tun "github.com/metacubex/sing-tun"
+-)
+-
+-func (l *Listener) buildAndroidRules(tunOptions *tun.Options) error {
+-	return nil
+-}
+diff --git a/rules/provider/patch_android.go b/rules/provider/patch_android.go
+new file mode 100644
+index 00000000..a45b9c52
+--- /dev/null
++++ b/rules/provider/patch_android.go
+@@ -0,0 +1,17 @@
++//go:build android
++
++package provider
++
++import "time"
++
++var (
++	suspended bool
++)
++
++type UpdatableProvider interface {
++	UpdatedAt() time.Time
++}
++
++func Suspend(s bool) {
++	suspended = s
++}
+diff --git a/scripts/smoke-smart-fallback.py b/scripts/smoke-smart-fallback.py
+index c078c83a..86de6ccb 100644
+--- a/scripts/smoke-smart-fallback.py
++++ b/scripts/smoke-smart-fallback.py
+@@ -176,7 +176,15 @@ rules:
+                         conn.close()
+ 
+                 wait_for(lambda: now() == "A", "initial priority selects A")
+-                assert business(), "initial proxy business failed"
++                # Bettbox owns listener lifecycle outside executor.ApplyConfig.
++                # Exercise the same listener API before sending test traffic.
++                request = urllib.request.Request(
++                    f"http://127.0.0.1:{api_port}/configs",
++                    data=json.dumps({"mixed-port": mixed_port, "lan-allowed-ips": ["127.0.0.1/32"]}).encode(),
++                    headers={"Content-Type": "application/json"}, method="PATCH")
++                with opener.open(request, timeout=2):
++                    pass
++                wait_for(business, "initial proxy business succeeds")
+                 a.failed.set()
+                 wait_for(lambda: now() == "B" and log_has("cooldown A"), "A trips; B carries traffic")
+                 assert business(), "B proxy business failed"
+diff --git a/transport/anytls/session/session.go b/transport/anytls/session/session.go
+index f2b3b199..0241fbb7 100644
+--- a/transport/anytls/session/session.go
++++ b/transport/anytls/session/session.go
+@@ -307,7 +307,7 @@ func (s *Session) recvLoop() error {
+ 						return err
+ 					}
+ 					if s.isClient {
+-						log.Errorln("[Alert from server] %s", string(buffer))
++						log.Warnln("[Alert from server] %s", string(buffer))
+ 					}
+ 					pool.Put(buffer)
+ 					return nil
+diff --git a/tunnel/statistic/manager.go b/tunnel/statistic/manager.go
+index c69746db..f3d3ba26 100644
+--- a/tunnel/statistic/manager.go
++++ b/tunnel/statistic/manager.go
+@@ -2,39 +2,53 @@ package statistic
+ 
+ import (
+ 	"os"
++	"runtime"
+ 	"time"
+ 
+ 	"github.com/metacubex/mihomo/common/atomic"
+ 	"github.com/metacubex/mihomo/common/xsync"
+-	"github.com/metacubex/mihomo/component/memory"
+ )
+ 
++var IsDirectFunc func(string) bool
++
+ var DefaultManager *Manager
+ 
+ func init() {
+ 	DefaultManager = &Manager{
+-		uploadTemp:    atomic.NewInt64(0),
+-		downloadTemp:  atomic.NewInt64(0),
+-		uploadBlip:    atomic.NewInt64(0),
+-		downloadBlip:  atomic.NewInt64(0),
+-		uploadTotal:   atomic.NewInt64(0),
+-		downloadTotal: atomic.NewInt64(0),
+-		pid:           int32(os.Getpid()),
++		uploadTemp:         atomic.NewInt64(0),
++		downloadTemp:       atomic.NewInt64(0),
++		uploadBlip:         atomic.NewInt64(0),
++		downloadBlip:       atomic.NewInt64(0),
++		uploadTotal:        atomic.NewInt64(0),
++		downloadTotal:      atomic.NewInt64(0),
++		proxyUploadTemp:    atomic.NewInt64(0),
++		proxyDownloadTemp:  atomic.NewInt64(0),
++		proxyUploadBlip:    atomic.NewInt64(0),
++		proxyDownloadBlip:  atomic.NewInt64(0),
++		proxyUploadTotal:   atomic.NewInt64(0),
++		proxyDownloadTotal: atomic.NewInt64(0),
++		pid:                int32(os.Getpid()),
+ 	}
+ 
+ 	go DefaultManager.handle()
+ }
+ 
+ type Manager struct {
+-	connections   xsync.Map[string, Tracker]
+-	uploadTemp    atomic.Int64
+-	downloadTemp  atomic.Int64
+-	uploadBlip    atomic.Int64
+-	downloadBlip  atomic.Int64
+-	uploadTotal   atomic.Int64
+-	downloadTotal atomic.Int64
+-	pid           int32
+-	memory        uint64
++	connections        xsync.Map[string, Tracker]
++	uploadTemp         atomic.Int64
++	downloadTemp       atomic.Int64
++	uploadBlip         atomic.Int64
++	downloadBlip       atomic.Int64
++	uploadTotal        atomic.Int64
++	downloadTotal      atomic.Int64
++	proxyUploadTemp    atomic.Int64
++	proxyDownloadTemp  atomic.Int64
++	proxyUploadBlip    atomic.Int64
++	proxyDownloadBlip  atomic.Int64
++	proxyUploadTotal   atomic.Int64
++	proxyDownloadTotal atomic.Int64
++	pid                int32
++	memory             uint64
+ }
+ 
+ func (m *Manager) Join(c Tracker) {
+@@ -43,6 +57,9 @@ func (m *Manager) Join(c Tracker) {
+ 
+ func (m *Manager) Leave(c Tracker) {
+ 	m.connections.Delete(c.ID())
++	if DefaultRequestNotify != nil {
++		DefaultRequestNotify(c)
++	}
+ }
+ 
+ func (m *Manager) Get(id string) (c Tracker) {
+@@ -58,12 +75,20 @@ func (m *Manager) Range(f func(c Tracker) bool) {
+ 	})
+ }
+ 
+-func (m *Manager) PushUploaded(size int64) {
++func (m *Manager) PushUploaded(isDirect bool, size int64) {
++	if !isDirect {
++		m.proxyUploadTemp.Add(size)
++		m.proxyUploadTotal.Add(size)
++	}
+ 	m.uploadTemp.Add(size)
+ 	m.uploadTotal.Add(size)
+ }
+ 
+-func (m *Manager) PushDownloaded(size int64) {
++func (m *Manager) PushDownloaded(isDirect bool, size int64) {
++	if !isDirect {
++		m.proxyDownloadTemp.Add(size)
++		m.proxyDownloadTotal.Add(size)
++	}
+ 	m.downloadTemp.Add(size)
+ 	m.downloadTotal.Add(size)
+ }
+@@ -81,28 +106,6 @@ func (m *Manager) Memory() uint64 {
+ 	return m.memory
+ }
+ 
+-func (m *Manager) Snapshot() *Snapshot {
+-	var connections []*TrackerInfo
+-	m.Range(func(c Tracker) bool {
+-		connections = append(connections, c.Info())
+-		return true
+-	})
+-	return &Snapshot{
+-		UploadTotal:   m.uploadTotal.Load(),
+-		DownloadTotal: m.downloadTotal.Load(),
+-		Connections:   connections,
+-		Memory:        m.memory,
+-	}
+-}
+-
+-func (m *Manager) updateMemory() {
+-	stat, err := memory.GetMemoryInfo(m.pid)
+-	if err != nil {
+-		return
+-	}
+-	m.memory = stat.RSS
+-}
+-
+ func (m *Manager) ResetStatistic() {
+ 	m.uploadTemp.Store(0)
+ 	m.uploadBlip.Store(0)
+@@ -110,6 +113,19 @@ func (m *Manager) ResetStatistic() {
+ 	m.downloadTemp.Store(0)
+ 	m.downloadBlip.Store(0)
+ 	m.downloadTotal.Store(0)
++
++	m.proxyUploadTemp.Store(0)
++	m.proxyUploadBlip.Store(0)
++	m.proxyUploadTotal.Store(0)
++	m.proxyDownloadTemp.Store(0)
++	m.proxyDownloadBlip.Store(0)
++	m.proxyDownloadTotal.Store(0)
++}
++
++func (m *Manager) updateMemory() {
++	var memStats runtime.MemStats
++	runtime.ReadMemStats(&memStats)
++	m.memory = memStats.StackInuse + memStats.HeapInuse
+ }
+ 
+ func (m *Manager) handle() {
+@@ -118,12 +134,31 @@ func (m *Manager) handle() {
+ 	for range ticker.C {
+ 		m.uploadBlip.Store(m.uploadTemp.Swap(0))
+ 		m.downloadBlip.Store(m.downloadTemp.Swap(0))
++		m.proxyUploadBlip.Store(m.proxyUploadTemp.Swap(0))
++		m.proxyDownloadBlip.Store(m.proxyDownloadTemp.Swap(0))
+ 	}
+ }
+ 
+ type Snapshot struct {
+-	DownloadTotal int64          `json:"downloadTotal"`
+-	UploadTotal   int64          `json:"uploadTotal"`
+-	Connections   []*TrackerInfo `json:"connections"`
+-	Memory        uint64         `json:"memory"`
++	DownloadTotal   int64         `json:"downloadTotal"`
++	UploadTotal     int64         `json:"uploadTotal"`
++	Connections     []TrackerInfo `json:"connections"`
++	Memory          uint64        `json:"memory"`
++}
++
++func (m *Manager) Snapshot() *Snapshot {
++	m.updateMemory()
++
++	connections := make([]TrackerInfo, 0)
++	m.connections.Range(func(key string, value Tracker) bool {
++		connections = append(connections, *value.Info())
++		return true
++	})
++
++	return &Snapshot{
++		DownloadTotal:   m.downloadTotal.Load(),
++		UploadTotal:     m.uploadTotal.Load(),
++		Connections:     connections,
++		Memory:          m.memory,
++	}
+ }
+diff --git a/tunnel/statistic/patch.go b/tunnel/statistic/patch.go
+new file mode 100644
+index 00000000..3f170ee8
+--- /dev/null
++++ b/tunnel/statistic/patch.go
+@@ -0,0 +1,19 @@
++package statistic
++
++type RequestNotify func(c Tracker)
++
++var DefaultRequestNotify RequestNotify
++
++func (m *Manager) TotalTraffic(onlyProxy bool) (up, down int64) {
++	if onlyProxy {
++		return m.proxyUploadTotal.Load(), m.proxyDownloadTotal.Load()
++	}
++	return m.uploadTotal.Load(), m.downloadTotal.Load()
++}
++
++func (m *Manager) NowTraffic(onlyProxy bool) (up, down int64) {
++	if onlyProxy {
++		return m.proxyUploadBlip.Load(), m.proxyDownloadBlip.Load()
++	}
++	return m.uploadBlip.Load(), m.downloadBlip.Load()
++}
+diff --git a/tunnel/statistic/patch_android.go b/tunnel/statistic/patch_android.go
+new file mode 100644
+index 00000000..1c4b43b0
+--- /dev/null
++++ b/tunnel/statistic/patch_android.go
+@@ -0,0 +1,3 @@
++//go:build android
++
++package statistic
+diff --git a/tunnel/statistic/tracker.go b/tunnel/statistic/tracker.go
+index 2fbb1cf9..b44ce295 100644
+--- a/tunnel/statistic/tracker.go
++++ b/tunnel/statistic/tracker.go
+@@ -3,6 +3,7 @@ package statistic
+ import (
+ 	"io"
+ 	"net"
++	"strings"
+ 	"time"
+ 
+ 	"github.com/metacubex/mihomo/common/atomic"
+@@ -31,6 +32,7 @@ type TrackerInfo struct {
+ 	ProviderChain C.Chain      `json:"providerChains"`
+ 	Rule          string       `json:"rule"`
+ 	RulePayload   string       `json:"rulePayload"`
++	IsDirect      bool         `json:"-"`
+ }
+ 
+ type tcpTracker struct {
+@@ -38,7 +40,8 @@ type tcpTracker struct {
+ 	*TrackerInfo
+ 	manager *Manager
+ 
+-	pushToManager bool `json:"-"`
++	pushToManager bool        `json:"-"`
++	closed        atomic.Bool `json:"-"`
+ }
+ 
+ func (tt *tcpTracker) ID() string {
+@@ -53,7 +56,7 @@ func (tt *tcpTracker) Read(b []byte) (int, error) {
+ 	n, err := tt.Conn.Read(b)
+ 	download := int64(n)
+ 	if tt.pushToManager {
+-		tt.manager.PushDownloaded(download)
++		tt.manager.PushDownloaded(tt.IsDirect, download)
+ 	}
+ 	tt.DownloadTotal.Add(download)
+ 	return n, err
+@@ -63,7 +66,7 @@ func (tt *tcpTracker) ReadBuffer(buffer *buf.Buffer) (err error) {
+ 	err = tt.Conn.ReadBuffer(buffer)
+ 	download := int64(buffer.Len())
+ 	if tt.pushToManager {
+-		tt.manager.PushDownloaded(download)
++		tt.manager.PushDownloaded(tt.IsDirect, download)
+ 	}
+ 	tt.DownloadTotal.Add(download)
+ 	return
+@@ -72,7 +75,7 @@ func (tt *tcpTracker) ReadBuffer(buffer *buf.Buffer) (err error) {
+ func (tt *tcpTracker) UnwrapReader() (io.Reader, []N.CountFunc) {
+ 	return tt.Conn, []N.CountFunc{func(download int64) {
+ 		if tt.pushToManager {
+-			tt.manager.PushDownloaded(download)
++			tt.manager.PushDownloaded(tt.IsDirect, download)
+ 		}
+ 		tt.DownloadTotal.Add(download)
+ 	}}
+@@ -82,7 +85,7 @@ func (tt *tcpTracker) Write(b []byte) (int, error) {
+ 	n, err := tt.Conn.Write(b)
+ 	upload := int64(n)
+ 	if tt.pushToManager {
+-		tt.manager.PushUploaded(upload)
++		tt.manager.PushUploaded(tt.IsDirect, upload)
+ 	}
+ 	tt.UploadTotal.Add(upload)
+ 	return n, err
+@@ -92,7 +95,7 @@ func (tt *tcpTracker) WriteBuffer(buffer *buf.Buffer) (err error) {
+ 	upload := int64(buffer.Len())
+ 	err = tt.Conn.WriteBuffer(buffer)
+ 	if tt.pushToManager {
+-		tt.manager.PushUploaded(upload)
++		tt.manager.PushUploaded(tt.IsDirect, upload)
+ 	}
+ 	tt.UploadTotal.Add(upload)
+ 	return
+@@ -101,14 +104,16 @@ func (tt *tcpTracker) WriteBuffer(buffer *buf.Buffer) (err error) {
+ func (tt *tcpTracker) UnwrapWriter() (io.Writer, []N.CountFunc) {
+ 	return tt.Conn, []N.CountFunc{func(upload int64) {
+ 		if tt.pushToManager {
+-			tt.manager.PushUploaded(upload)
++			tt.manager.PushUploaded(tt.IsDirect, upload)
+ 		}
+ 		tt.UploadTotal.Add(upload)
+ 	}}
+ }
+ 
+ func (tt *tcpTracker) Close() error {
+-	tt.manager.Leave(tt)
++	if tt.closed.CompareAndSwap(false, true) {
++		tt.manager.Leave(tt)
++	}
+ 	return tt.Conn.Close()
+ }
+ 
+@@ -119,38 +124,43 @@ func (tt *tcpTracker) Upstream() any {
+ func NewTCPTracker(conn C.Conn, manager *Manager, metadata *C.Metadata, rule C.Rule, uploadTotal int64, downloadTotal int64, pushToManager bool) *tcpTracker {
+ 	metadata.RemoteDst = conn.RemoteDestination()
+ 
+-	t := &tcpTracker{
++	chains := conn.Chains()
++	lastChain := chains.Last()
++	isDirect := strings.ToUpper(lastChain) == "DIRECT" || (IsDirectFunc != nil && IsDirectFunc(lastChain))
++
++	tt := &tcpTracker{
+ 		Conn:    conn,
+ 		manager: manager,
+ 		TrackerInfo: &TrackerInfo{
+ 			UUID:          utils.NewUUIDV4(),
+ 			Start:         time.Now(),
+ 			Metadata:      metadata,
+-			Chain:         conn.Chains(),
++			Chain:         chains,
+ 			ProviderChain: conn.ProviderChains(),
+ 			Rule:          "",
+ 			UploadTotal:   atomic.NewInt64(uploadTotal),
+ 			DownloadTotal: atomic.NewInt64(downloadTotal),
++			IsDirect:      isDirect,
+ 		},
+ 		pushToManager: pushToManager,
+ 	}
+ 
+ 	if pushToManager {
+ 		if uploadTotal > 0 {
+-			manager.PushUploaded(uploadTotal)
++			manager.PushUploaded(isDirect, uploadTotal)
+ 		}
+ 		if downloadTotal > 0 {
+-			manager.PushDownloaded(downloadTotal)
++			manager.PushDownloaded(isDirect, downloadTotal)
+ 		}
+ 	}
+ 
+ 	if rule != nil {
+-		t.TrackerInfo.Rule = rule.RuleType().String()
+-		t.TrackerInfo.RulePayload = rule.Payload()
++		tt.TrackerInfo.Rule = rule.RuleType().String()
++		tt.TrackerInfo.RulePayload = rule.Payload()
+ 	}
+ 
+-	manager.Join(t)
+-	return t
++	manager.Join(tt)
++	return tt
+ }
+ 
+ type udpTracker struct {
+@@ -158,7 +168,8 @@ type udpTracker struct {
+ 	*TrackerInfo
+ 	manager *Manager
+ 
+-	pushToManager bool `json:"-"`
++	pushToManager bool        `json:"-"`
++	closed        atomic.Bool `json:"-"`
+ }
+ 
+ func (ut *udpTracker) ID() string {
+@@ -173,7 +184,7 @@ func (ut *udpTracker) ReadFrom(b []byte) (int, net.Addr, error) {
+ 	n, addr, err := ut.PacketConn.ReadFrom(b)
+ 	download := int64(n)
+ 	if ut.pushToManager {
+-		ut.manager.PushDownloaded(download)
++		ut.manager.PushDownloaded(ut.IsDirect, download)
+ 	}
+ 	ut.DownloadTotal.Add(download)
+ 	return n, addr, err
+@@ -183,7 +194,7 @@ func (ut *udpTracker) WaitReadFrom() (data []byte, put func(), addr net.Addr, er
+ 	data, put, addr, err = ut.PacketConn.WaitReadFrom()
+ 	download := int64(len(data))
+ 	if ut.pushToManager {
+-		ut.manager.PushDownloaded(download)
++		ut.manager.PushDownloaded(ut.IsDirect, download)
+ 	}
+ 	ut.DownloadTotal.Add(download)
+ 	return
+@@ -193,14 +204,16 @@ func (ut *udpTracker) WriteTo(b []byte, addr net.Addr) (int, error) {
+ 	n, err := ut.PacketConn.WriteTo(b, addr)
+ 	upload := int64(n)
+ 	if ut.pushToManager {
+-		ut.manager.PushUploaded(upload)
++		ut.manager.PushUploaded(ut.IsDirect, upload)
+ 	}
+ 	ut.UploadTotal.Add(upload)
+ 	return n, err
+ }
+ 
+ func (ut *udpTracker) Close() error {
+-	ut.manager.Leave(ut)
++	if ut.closed.CompareAndSwap(false, true) {
++		ut.manager.Leave(ut)
++	}
+ 	return ut.PacketConn.Close()
+ }
+ 
+@@ -211,6 +224,10 @@ func (ut *udpTracker) Upstream() any {
+ func NewUDPTracker(conn C.PacketConn, manager *Manager, metadata *C.Metadata, rule C.Rule, uploadTotal int64, downloadTotal int64, pushToManager bool) *udpTracker {
+ 	metadata.RemoteDst = conn.RemoteDestination()
+ 
++	chains := conn.Chains()
++	lastChain := chains.Last()
++	isDirect := strings.ToUpper(lastChain) == "DIRECT" || (IsDirectFunc != nil && IsDirectFunc(lastChain))
++
+ 	ut := &udpTracker{
+ 		PacketConn: conn,
+ 		manager:    manager,
+@@ -218,21 +235,22 @@ func NewUDPTracker(conn C.PacketConn, manager *Manager, metadata *C.Metadata, ru
+ 			UUID:          utils.NewUUIDV4(),
+ 			Start:         time.Now(),
+ 			Metadata:      metadata,
+-			Chain:         conn.Chains(),
++			Chain:         chains,
+ 			ProviderChain: conn.ProviderChains(),
+ 			Rule:          "",
+ 			UploadTotal:   atomic.NewInt64(uploadTotal),
+ 			DownloadTotal: atomic.NewInt64(downloadTotal),
++			IsDirect:      isDirect,
+ 		},
+ 		pushToManager: pushToManager,
+ 	}
+ 
+ 	if pushToManager {
+ 		if uploadTotal > 0 {
+-			manager.PushUploaded(uploadTotal)
++			manager.PushUploaded(isDirect, uploadTotal)
+ 		}
+ 		if downloadTotal > 0 {
+-			manager.PushDownloaded(downloadTotal)
++			manager.PushDownloaded(isDirect, downloadTotal)
+ 		}
+ 	}
+ 
+diff --git a/tunnel/tunnel.go b/tunnel/tunnel.go
+index 35f7fe86..a7465502 100644
+--- a/tunnel/tunnel.go
++++ b/tunnel/tunnel.go
+@@ -77,6 +77,17 @@ var _ C.Tunnel = Tunnel
+ var _ P.Tunnel = Tunnel
+ var _ proxydialer.Tunnel = Tunnel
+ 
++func init() {
++	statistic.IsDirectFunc = func(name string) bool {
++		configMux.RLock()
++		defer configMux.RUnlock()
++		if proxy, ok := proxies[name]; ok {
++			return proxy.Type() == C.Direct
++		}
++		return false
++	}
++}
++
+ func (t tunnel) HandleTCPConn(conn net.Conn, metadata *C.Metadata) {
+ 	connCtx := icontext.NewConnContext(conn, metadata)
+ 	handleTCPConn(connCtx)
+@@ -360,7 +371,7 @@ func resolveMetadata(metadata *C.Metadata) (proxy C.Proxy, rule C.Rule, err erro
+ 		FindProcess: func() {
+ 			if attemptProcessLookup {
+ 				attemptProcessLookup = false
+-				if !features.CMFA {
++				if !features.Android {
+ 					// normal check for process
+ 					uid, path, err := process.FindProcessName(metadata.NetWork.String(), metadata.SrcIP, int(metadata.SrcPort))
+ 					if err != nil {
+@@ -472,6 +483,21 @@ func handleUDPConn(packet C.PacketAdapter) {
+ 				return nil, nil, err
+ 			}
+ 
++			target := proxy
++			for a := proxy; a != nil; a = a.Unwrap(metadata, false) {
++				target = a
++			}
++			if target.Type() == C.Reject {
++				if rejector, ok := packet.(C.PacketRejector); ok {
++					_ = rejector.Reject()
++				}
++				logMetadataProxy(metadata, rule, proxy)
++				return nil, nil, errors.New("rejected")
++			} else if target.Type() == C.RejectDrop {
++				logMetadataProxy(metadata, rule, proxy)
++				return nil, nil, errors.New("reject dropped")
++			}
++
+ 			dialMetadata := metadata.Pure()
+ 			ctx, cancel := context.WithTimeout(context.Background(), C.DefaultUDPTimeout)
+ 			defer cancel()
+@@ -660,6 +686,26 @@ func logMetadata(metadata *C.Metadata, rule C.Rule, remoteConn C.Connection) {
+ 	}
+ }
+ 
++func logMetadataProxy(metadata *C.Metadata, rule C.Rule, proxy C.Proxy) {
++	name := proxy.Name()
++	switch {
++	case metadata.SpecialProxy != "":
++		log.Infoln("[%s] %s --> %s using %s", strings.ToUpper(metadata.NetWork.String()), metadata.SourceDetail(), metadata.RemoteAddress(), name)
++	case rule != nil:
++		if rule.Payload() != "" {
++			log.Infoln("[%s] %s --> %s match %s using %s", strings.ToUpper(metadata.NetWork.String()), metadata.SourceDetail(), metadata.RemoteAddress(), fmt.Sprintf("%s(%s)", rule.RuleType().String(), rule.Payload()), name)
++		} else {
++			log.Infoln("[%s] %s --> %s match %s using %s", strings.ToUpper(metadata.NetWork.String()), metadata.SourceDetail(), metadata.RemoteAddress(), rule.RuleType().String(), name)
++		}
++	case mode == Global:
++		log.Infoln("[%s] %s --> %s using GLOBAL", strings.ToUpper(metadata.NetWork.String()), metadata.SourceDetail(), metadata.RemoteAddress())
++	case mode == Direct:
++		log.Infoln("[%s] %s --> %s using DIRECT", strings.ToUpper(metadata.NetWork.String()), metadata.SourceDetail(), metadata.RemoteAddress())
++	default:
++		log.Infoln("[%s] %s --> %s doesn't match any rule using %s", strings.ToUpper(metadata.NetWork.String()), metadata.SourceDetail(), metadata.RemoteAddress(), name)
++	}
++}
++
+ func match(metadata *C.Metadata, helper C.RuleMatchHelper) (C.Proxy, C.Rule, error) {
+ 	configMux.RLock()
+ 	defer configMux.RUnlock()

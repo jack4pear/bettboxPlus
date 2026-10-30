@@ -1,4 +1,4 @@
-package com.appshub.bettbox.models
+package io.github.jack4pear.bettboxplus.models
 
 import java.net.InetAddress
 

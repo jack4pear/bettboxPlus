@@ -27,4 +27,15 @@ void main() {
       );
     });
   });
+  test('import normalization preserves enhanced nested fields', () {
+    const source =
+        'proxy-groups:\n\t- name: Smart\n\t  smart-fallback:\n\t    enabled: true\n\t    cooldown: [1800, 3600, 7200]\n';
+    final result = utils.patchValidateConfig(utils.patchYamlConfig(source));
+    expect(
+      result,
+      contains(
+        'smart-fallback:\n      enabled: true\n      cooldown: [1800, 3600, 7200]',
+      ),
+    );
+  });
 }

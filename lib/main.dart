@@ -92,7 +92,7 @@ Future<void> _runApp() async {
   if (system.isWindows) {
     clipboardExt.init();
   }
-  HttpOverrides.global = BettboxHttpOverrides();
+  HttpOverrides.global = BettboxPlusHttpOverrides();
   runApp(ProviderScope(retry: (_, _) => null, child: const Application()));
 }
 
@@ -224,7 +224,7 @@ Future<void> _service(List<String> flags) async {
           final profile = globalState.config.profiles
               .where((e) => e.id == profileId)
               .firstOrNull;
-          final profileName = profile?.label ?? 'Bettbox';
+          final profileName = profile?.label ?? 'BettboxPlus';
           await vpn?.updateNotificationSpeed(profileName, '↑0B/s ↓0B/s');
         }
 

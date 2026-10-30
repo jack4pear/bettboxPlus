@@ -16,7 +16,7 @@ val mKeyPassword: String? = localProperties.getProperty("keyPassword")
 val isRelease = mStoreFile.exists() && mStorePassword != null && mKeyAlias != null && mKeyPassword != null
 
 android {
-    namespace = "com.appshub.bettbox"
+    namespace = "io.github.jack4pear.bettboxplus"
     compileSdk = 36
     ndkVersion = "28.2.13676358"
 
@@ -26,7 +26,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.appshub.bettbox"
+        applicationId = "io.github.jack4pear.bettboxplus"
         minSdk = 26
         targetSdk = 36
         versionCode = flutter.versionCode
@@ -52,7 +52,10 @@ android {
         release {
             isMinifyEnabled = true
             isDebuggable = false
-            signingConfig = signingConfigs.getByName(if (isRelease) "release" else "debug")
+            if (gradle.startParameter.taskNames.any { it.contains("release", ignoreCase = true) }) {
+                check(isRelease) { "BettboxPlus release requires its persistent keystore and all signing properties; debug signing is forbidden." }
+            }
+            if (isRelease) signingConfig = signingConfigs.getByName("release")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }

@@ -1,4 +1,4 @@
-package com.appshub.bettbox.plugins
+package io.github.jack4pear.bettboxplus.plugins
 
 import android.Manifest
 import android.app.Activity
@@ -20,12 +20,12 @@ import androidx.core.content.getSystemService
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
-import com.appshub.bettbox.BettboxApplication
-import com.appshub.bettbox.GlobalState
-import com.appshub.bettbox.R
-import com.appshub.bettbox.extensions.awaitResult
-import com.appshub.bettbox.extensions.getActionIntent
-import com.appshub.bettbox.models.Package
+import io.github.jack4pear.bettboxplus.BettboxPlusApplication
+import io.github.jack4pear.bettboxplus.GlobalState
+import io.github.jack4pear.bettboxplus.R
+import io.github.jack4pear.bettboxplus.extensions.awaitResult
+import io.github.jack4pear.bettboxplus.extensions.getActionIntent
+import io.github.jack4pear.bettboxplus.models.Package
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
@@ -68,7 +68,7 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
     private val chinaPackageCache = ConcurrentHashMap<String, Boolean>()
 
     private val iconCacheDir by lazy {
-        File(BettboxApplication.getAppContext().cacheDir, "app_icons").apply {
+        File(BettboxPlusApplication.getAppContext().cacheDir, "app_icons").apply {
             if (!exists()) mkdirs()
         }
     }
@@ -155,38 +155,38 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
     }
 
     private fun initShortcuts(labels: Map<*, *>) {
-        val toggleShortcut = ShortcutInfoCompat.Builder(BettboxApplication.getAppContext(), "toggle")
+        val toggleShortcut = ShortcutInfoCompat.Builder(BettboxPlusApplication.getAppContext(), "toggle")
             .setShortLabel(labels["toggle"]?.toString() ?: "Toggle")
-            .setIcon(createBitmapIcon(BettboxApplication.getAppContext(), R.drawable.ic_shortcut_toggle))
-            .setIntent(BettboxApplication.getAppContext().getActionIntent("CHANGE"))
+            .setIcon(createBitmapIcon(BettboxPlusApplication.getAppContext(), R.drawable.ic_shortcut_toggle))
+            .setIntent(BettboxPlusApplication.getAppContext().getActionIntent("CHANGE"))
             .build()
 
-        val startShortcut = ShortcutInfoCompat.Builder(BettboxApplication.getAppContext(), "start")
+        val startShortcut = ShortcutInfoCompat.Builder(BettboxPlusApplication.getAppContext(), "start")
             .setShortLabel(labels["start"]?.toString() ?: "Start")
-            .setIcon(createBitmapIcon(BettboxApplication.getAppContext(), R.drawable.ic_shortcut_start))
-            .setIntent(BettboxApplication.getAppContext().getActionIntent("START"))
+            .setIcon(createBitmapIcon(BettboxPlusApplication.getAppContext(), R.drawable.ic_shortcut_start))
+            .setIntent(BettboxPlusApplication.getAppContext().getActionIntent("START"))
             .build()
 
-        val stopShortcut = ShortcutInfoCompat.Builder(BettboxApplication.getAppContext(), "stop")
+        val stopShortcut = ShortcutInfoCompat.Builder(BettboxPlusApplication.getAppContext(), "stop")
             .setShortLabel(labels["stop"]?.toString() ?: "Stop")
-            .setIcon(createBitmapIcon(BettboxApplication.getAppContext(), R.drawable.ic_shortcut_stop))
-            .setIntent(BettboxApplication.getAppContext().getActionIntent("STOP"))
+            .setIcon(createBitmapIcon(BettboxPlusApplication.getAppContext(), R.drawable.ic_shortcut_stop))
+            .setIntent(BettboxPlusApplication.getAppContext().getActionIntent("STOP"))
             .build()
 
         ShortcutManagerCompat.setDynamicShortcuts(
-            BettboxApplication.getAppContext(), 
+            BettboxPlusApplication.getAppContext(),
             listOf(startShortcut, stopShortcut, toggleShortcut)
         )
     }
 
     private fun isSystemInDarkMode(): Boolean {
-        val nightModeFlags = BettboxApplication.getAppContext().resources.configuration.uiMode and
+        val nightModeFlags = BettboxPlusApplication.getAppContext().resources.configuration.uiMode and
             Configuration.UI_MODE_NIGHT_MASK
         return nightModeFlags == Configuration.UI_MODE_NIGHT_YES
     }
 
     private fun isAndroidTV(): Boolean {
-        val uiMode = BettboxApplication.getAppContext().resources.configuration.uiMode
+        val uiMode = BettboxPlusApplication.getAppContext().resources.configuration.uiMode
         return (uiMode and Configuration.UI_MODE_TYPE_MASK) == Configuration.UI_MODE_TYPE_TELEVISION
     }
 
@@ -197,7 +197,7 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
 
     private fun tip(message: String?) {
         if (GlobalState.flutterEngine == null) {
-            Toast.makeText(BettboxApplication.getAppContext(), message, Toast.LENGTH_LONG).show()
+            Toast.makeText(BettboxPlusApplication.getAppContext(), message, Toast.LENGTH_LONG).show()
         }
     }
 
@@ -229,8 +229,8 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
                 val packageName = call.argument<String>("packageName")
                 val forceRefresh = call.argument<Boolean>("forceRefresh") ?: false
                 val icon = runCatching {
-                    packageName?.let { 
-                        getPackageIconBytes(it, forceRefresh) 
+                    packageName?.let {
+                        getPackageIconBytes(it, forceRefresh)
                     } ?: getDefaultIconBytes()
                 }.getOrNull() ?: getDefaultIconBytes()
                 result.success(icon)
@@ -278,7 +278,7 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
     }
 
     private fun openFcmDiagnostics(): Boolean {
-        val context = BettboxApplication.getAppContext()
+        val context = BettboxPlusApplication.getAppContext()
         val intent = Intent().apply {
             component = ComponentName("com.google.android.gms", "com.google.android.gms.gcm.GcmDiagnostics")
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -290,7 +290,7 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
     }
 
     private fun updateExcludeFromRecents(value: Boolean?) {
-        val am = BettboxApplication.getAppContext().getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+        val am = BettboxPlusApplication.getAppContext().getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
         val task = am?.appTasks?.firstOrNull { task ->
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 task.taskInfo.taskId == activityRef?.get()?.taskId
@@ -308,7 +308,7 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
     }
 
     private fun getIconSizePx(): Int {
-        val density = BettboxApplication.getAppContext().resources.displayMetrics.density
+        val density = BettboxPlusApplication.getAppContext().resources.displayMetrics.density
         return (ICON_SIZE_DP * density).toInt().coerceAtLeast(1)
     }
 
@@ -325,7 +325,7 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
     }
 
     private fun getDefaultIconBytes(): ByteArray? = runCatching {
-        drawableToPngBytes(BettboxApplication.getAppContext().packageManager.defaultActivityIcon, getIconSizePx())
+        drawableToPngBytes(BettboxPlusApplication.getAppContext().packageManager.defaultActivityIcon, getIconSizePx())
     }.getOrNull()
 
     private fun isPngBytes(bytes: ByteArray): Boolean {
@@ -336,7 +336,7 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
 
     private suspend fun getPackageIconBytes(packageName: String, forceRefresh: Boolean = false): ByteArray? =
         withContext(Dispatchers.IO) {
-            val pm = BettboxApplication.getAppContext().packageManager ?: return@withContext null
+            val pm = BettboxPlusApplication.getAppContext().packageManager ?: return@withContext null
             runCatching {
                 val packageInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     pm.getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(0))
@@ -375,8 +375,8 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
     }
 
     private suspend fun loadPackages(): List<Package> = coroutineScope {
-        val pm = BettboxApplication.getAppContext().packageManager ?: return@coroutineScope emptyList()
-        val selfPackageName = BettboxApplication.getAppContext().packageName
+        val pm = BettboxPlusApplication.getAppContext().packageManager ?: return@coroutineScope emptyList()
+        val selfPackageName = BettboxPlusApplication.getAppContext().packageName
         val packageInfos = pm.getInstalledPackages(0)
         val chunkSize = packageInfos.size / Runtime.getRuntime().availableProcessors() + 1
 
@@ -426,7 +426,7 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
 
     fun requestVpnPermission(callBack: () -> Unit) {
         vpnCallBack = callBack
-        val intent = runCatching { VpnService.prepare(BettboxApplication.getAppContext()) }.getOrNull()
+        val intent = runCatching { VpnService.prepare(BettboxPlusApplication.getAppContext()) }.getOrNull()
         if (intent != null) {
             val activity = activityRef?.get()
             if (activity != null) {
@@ -445,7 +445,7 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
     fun requestNotificationsPermission() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
         if (isBlockNotification || activityRef?.get() == null) return
-        if (ContextCompat.checkSelfPermission(BettboxApplication.getAppContext(), Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) return
+        if (ContextCompat.checkSelfPermission(BettboxPlusApplication.getAppContext(), Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) return
         activityRef?.get()?.let {
             ActivityCompat.requestPermissions(it, arrayOf(Manifest.permission.POST_NOTIFICATIONS), NOTIFICATION_PERMISSION_REQUEST_CODE)
         }
@@ -459,7 +459,7 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
         chinaPackageCache.getOrPut(packageName) { isChinaPackageInternal(packageName) }
 
     private fun isChinaPackageInternal(packageName: String): Boolean {
-        val context = BettboxApplication.getAppContext()
+        val context = BettboxPlusApplication.getAppContext()
         val pm = context.packageManager ?: return false
         if (SKIP_PREFIX_LIST.any { packageName == it || packageName.startsWith("$it.") }) return false
         if (packageName.matches(CHINA_APP_REGEX)) return true
@@ -543,20 +543,20 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
 
     private fun isIgnoringBatteryOptimizations(): Boolean =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val powerManager = BettboxApplication.getAppContext().getSystemService(android.content.Context.POWER_SERVICE) as? android.os.PowerManager
-            powerManager?.isIgnoringBatteryOptimizations(BettboxApplication.getAppContext().packageName) ?: false
+            val powerManager = BettboxPlusApplication.getAppContext().getSystemService(android.content.Context.POWER_SERVICE) as? android.os.PowerManager
+            powerManager?.isIgnoringBatteryOptimizations(BettboxPlusApplication.getAppContext().packageName) ?: false
         } else true
 
     private fun requestIgnoreBatteryOptimizations() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return
         val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-            data = Uri.parse("package:${BettboxApplication.getAppContext().packageName}")
+            data = Uri.parse("package:${BettboxPlusApplication.getAppContext().packageName}")
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        runCatching { BettboxApplication.getAppContext().startActivity(intent) }
+        runCatching { BettboxPlusApplication.getAppContext().startActivity(intent) }
             .onFailure {
                 runCatching {
-                    BettboxApplication.getAppContext().startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).apply {
+                    BettboxPlusApplication.getAppContext().startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).apply {
                         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     })
                 }
@@ -564,12 +564,12 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
     }
 
     private fun setLauncherIcon(useDarkIcon: Boolean) {
-        val context = BettboxApplication.getAppContext()
+        val context = BettboxPlusApplication.getAppContext()
         val pm = context.packageManager
         val packageName = context.packageName
-        val defaultComponent = android.content.ComponentName(packageName, "com.appshub.bettbox.MainActivity")
-        val lightComponent = android.content.ComponentName(packageName, "com.appshub.bettbox.MainActivityLight")
-        val darkComponent = android.content.ComponentName(packageName, "com.appshub.bettbox.MainActivityDark")
+        val defaultComponent = android.content.ComponentName(packageName, "io.github.jack4pear.bettboxplus.MainActivity")
+        val lightComponent = android.content.ComponentName(packageName, "io.github.jack4pear.bettboxplus.MainActivityLight")
+        val darkComponent = android.content.ComponentName(packageName, "io.github.jack4pear.bettboxplus.MainActivityDark")
 
         if (useDarkIcon) {
             pm.setComponentEnabledSetting(darkComponent, PackageManager.COMPONENT_ENABLED_STATE_ENABLED, PackageManager.DONT_KILL_APP)
@@ -580,13 +580,13 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
             pm.setComponentEnabledSetting(darkComponent, PackageManager.COMPONENT_ENABLED_STATE_DISABLED, PackageManager.DONT_KILL_APP)
             pm.setComponentEnabledSetting(lightComponent, PackageManager.COMPONENT_ENABLED_STATE_DISABLED, PackageManager.DONT_KILL_APP)
         }
-        com.appshub.bettbox.services.NotificationComponentCache.invalidate()
+        io.github.jack4pear.bettboxplus.services.NotificationComponentCache.invalidate()
         VpnPlugin.updateNotificationIcon()
     }
 
     private fun hasPackageListPermission(): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return true
-        val context = BettboxApplication.getAppContext()
+        val context = BettboxPlusApplication.getAppContext()
         val pm = context.packageManager
         return arrayOf("com.android.settings", "com.android.systemui").any { pkg ->
             runCatching {
@@ -605,20 +605,20 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
     }
 
     private fun hasCameraPermission(): Boolean =
-        ContextCompat.checkSelfPermission(BettboxApplication.getAppContext(), Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        ContextCompat.checkSelfPermission(BettboxPlusApplication.getAppContext(), Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
 
     private fun openAppSettings() {
         val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-            data = Uri.parse("package:${BettboxApplication.getAppContext().packageName}")
+            data = Uri.parse("package:${BettboxPlusApplication.getAppContext().packageName}")
         }
         activityRef?.get()?.startActivity(intent) ?: run {
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            BettboxApplication.getAppContext().startActivity(intent)
+            BettboxPlusApplication.getAppContext().startActivity(intent)
         }
     }
 
     private fun getSelfLastUpdateTime(): Long {
-        val context = BettboxApplication.getAppContext()
+        val context = BettboxPlusApplication.getAppContext()
         val pm = context.packageManager
         return runCatching {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

@@ -470,6 +470,10 @@ func prepareSetup(params *SetupParams) (*preparedSetup, error) {
 
 	if params.OverrideTestUrl && rawCfg.ProxyGroup != nil {
 		for _, group := range rawCfg.ProxyGroup {
+			// Enhanced groups must retain the URL matching their provider health task.
+			if smart, ok := group["smart-fallback"].(map[string]any); ok && smart["enabled"] == true {
+				continue
+			}
 			group["url"] = params.TestURL
 		}
 	}

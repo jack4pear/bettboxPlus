@@ -1,4 +1,4 @@
-package com.appshub.bettbox.services
+package io.github.jack4pear.bettboxplus.services
 
 import android.content.BroadcastReceiver
 import android.content.Context

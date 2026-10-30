@@ -1,4 +1,4 @@
-package com.appshub.bettbox.services
+package io.github.jack4pear.bettboxplus.services
 
 import android.annotation.SuppressLint
 import android.content.BroadcastReceiver
@@ -14,21 +14,21 @@ import android.os.Parcel
 import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import com.appshub.bettbox.GlobalState
-import com.appshub.bettbox.extensions.getIpv4RouteAddress
-import com.appshub.bettbox.extensions.getIpv6RouteAddress
-import com.appshub.bettbox.extensions.toCIDR
-import com.appshub.bettbox.models.AccessControlMode
-import com.appshub.bettbox.models.VpnOptions
-import com.appshub.bettbox.plugins.VpnPlugin
-import com.appshub.bettbox.R
+import io.github.jack4pear.bettboxplus.GlobalState
+import io.github.jack4pear.bettboxplus.extensions.getIpv4RouteAddress
+import io.github.jack4pear.bettboxplus.extensions.getIpv6RouteAddress
+import io.github.jack4pear.bettboxplus.extensions.toCIDR
+import io.github.jack4pear.bettboxplus.models.AccessControlMode
+import io.github.jack4pear.bettboxplus.models.VpnOptions
+import io.github.jack4pear.bettboxplus.plugins.VpnPlugin
+import io.github.jack4pear.bettboxplus.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
-class BettboxVpnService : VpnService(), BaseServiceInterface {
+class BettboxPlusVpnService : VpnService(), BaseServiceInterface {
     companion object {
-        private const val TAG = "BettboxVpnService"
+        private const val TAG = "BettboxPlusVpnService"
     }
 
     @Volatile
@@ -140,7 +140,7 @@ class BettboxVpnService : VpnService(), BaseServiceInterface {
             }
         }
 
-        setSession("Bettbox")
+        setSession("BettboxPlus")
         setBlocking(false)
         if (Build.VERSION.SDK_INT >= 29) setMetered(false)
         if (options.allowBypass) allowBypass()
@@ -214,7 +214,7 @@ class BettboxVpnService : VpnService(), BaseServiceInterface {
 
     private suspend fun notificationBuilder(): NotificationCompat.Builder {
         if (cachedBuilder == null) {
-            cachedBuilder = createBettboxNotificationBuilder()
+            cachedBuilder = createBettboxPlusNotificationBuilder()
         }
         return cachedBuilder!!
     }
@@ -235,7 +235,7 @@ class BettboxVpnService : VpnService(), BaseServiceInterface {
         }
 
         lastNotificationText = null
-        val builder = createBettboxNotificationBuilder(isSuspended, isHighPriority)
+        val builder = createBettboxPlusNotificationBuilder(isSuspended, isHighPriority)
         val notification = builder
             .setContentTitle(title)
             .setContentText(content)
@@ -307,7 +307,7 @@ class BettboxVpnService : VpnService(), BaseServiceInterface {
     private val binder = LocalBinder()
 
     inner class LocalBinder : Binder() {
-        fun getService(): BettboxVpnService = this@BettboxVpnService
+        fun getService(): BettboxPlusVpnService = this@BettboxPlusVpnService
 
         override fun onTransact(code: Int, data: Parcel, reply: Parcel?, flags: Int): Boolean =
             runCatching {

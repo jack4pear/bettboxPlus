@@ -3,7 +3,8 @@ import 'dart:io';
 
 import 'package:bett_box/common/common.dart';
 import 'package:bett_box/models/models.dart';
-import 'package:flutter/services.dart';
+// ignore: depend_on_referenced_packages
+import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -11,12 +12,8 @@ void main() {
   late Directory home;
 
   setUpAll(() async {
-    home = await Directory.systemTemp.createTemp('bettbox_profiles_');
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(
-          const MethodChannel('plugins.flutter.io/path_provider'),
-          (call) async => home.path,
-        );
+    home = await Directory.systemTemp.createTemp('bettboxplus_profiles_');
+    PathProviderPlatform.instance = _ProfilePaths(home.path);
   });
 
   tearDownAll(() => home.delete(recursive: true));
@@ -38,4 +35,29 @@ void main() {
     expect(await file.lastModified(), isNot(stamp));
     expect(await file.readAsString(), 'proxies: []\nrules: []\n');
   });
+  test('saved subscription preserves Smart Fallback settings', () async {
+    const profile = Profile(
+      id: 'smart-profile',
+      autoUpdateDuration: Duration(hours: 1),
+    );
+    final source = File('examples/smart-fallback.yaml').readAsBytesSync();
+    await profile.saveFile(source, validate: false);
+    final saved = await File(
+      await appPath.getProfilePath(profile.id),
+    ).readAsString();
+    expect(saved, utf8.decode(source));
+    expect(saved, contains('smart-fallback:'));
+    expect(saved, contains('cooldown: [1800, 3600, 7200]'));
+  });
+}
+
+class _ProfilePaths extends PathProviderPlatform {
+  _ProfilePaths(this.path);
+  final String path;
+  @override
+  Future<String?> getApplicationSupportPath() async => path;
+  @override
+  Future<String?> getTemporaryPath() async => path;
+  @override
+  Future<String?> getDownloadsPath() async => path;
 }

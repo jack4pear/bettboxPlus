@@ -1,12 +1,12 @@
-package com.appshub.bettbox.services
+package io.github.jack4pear.bettboxplus.services
 
 import android.os.Build
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
 import androidx.annotation.RequiresApi
-import com.appshub.bettbox.GlobalState
-import com.appshub.bettbox.RunState
-import com.appshub.bettbox.R
+import io.github.jack4pear.bettboxplus.GlobalState
+import io.github.jack4pear.bettboxplus.RunState
+import io.github.jack4pear.bettboxplus.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -14,11 +14,11 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 @RequiresApi(Build.VERSION_CODES.N)
-class BettboxTileService : TileService() {
+class BettboxPlusTileService : TileService() {
 
     companion object {
         @Volatile
-        private var activeInstance: BettboxTileService? = null
+        private var activeInstance: BettboxPlusTileService? = null
 
         fun refreshActive() {
             activeInstance?.updateTile(GlobalState.currentRunState)

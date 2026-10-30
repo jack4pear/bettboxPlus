@@ -1,0 +1,13 @@
+* text=auto eol=lf
+*.png -text
+*.ico -text
+*.ttf -text
+*.zip -text
+*.7z -text
+*.dat -text
+*.mmdb -text
+*.metadb -text
+
+# Preserve exact patch context and vendored upstream workflow bytes.
+patches/*.patch -whitespace
+core/Clash.Meta/.github/** -whitespace

@@ -1,10 +1,10 @@
-package com.appshub.bettbox.receivers
+package io.github.jack4pear.bettboxplus.receivers
 
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import com.appshub.bettbox.GlobalState
+import io.github.jack4pear.bettboxplus.GlobalState
 
 class BootReceiver : BroadcastReceiver() {
     companion object {

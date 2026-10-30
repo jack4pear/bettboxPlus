@@ -43,7 +43,7 @@ void main() {
       start: DateTime(2026),
       metadata: const Metadata(
         process: 'app',
-        processPath: '/tmp/bettbox-test/missing-app',
+        processPath: '/tmp/bettboxplus-test/missing-app',
       ),
       chains: const ['DIRECT'],
       rule: '',

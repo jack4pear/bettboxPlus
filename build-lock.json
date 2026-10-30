@@ -1,0 +1,40 @@
+{
+  "client": {
+    "repository": "jack4pear/bettboxPlus",
+    "upstream": "appshubcc/Bettbox",
+    "upstream_commit": "1fb8806fdf8275a3694cda31eec7ed2062330aee",
+    "version": "1.19.7-plus.1+2026103001"
+  },
+  "kernel": {
+    "repository": "jack4pear/mihomoPlus",
+    "branch": "Meta",
+    "commit": "3803eebbdb4ac3e92d39b1104e1c5ae668c2b18f",
+    "version": "v1.19.33-smart.1",
+    "upstream_commit": "3f27ef39f8c96bbfbc8b0b9bb10f5c9ef60149d8",
+    "bridge_patch": "patches/bettbox-bridge.patch",
+    "bridge_sha256": "0008c4d8ef760175a2562d33ffbdd6a90912b3e9acc7f1950890690213ab2d36"
+  },
+  "toolchain": {
+    "go": "1.26.10",
+    "flutter": "3.47.7",
+    "flutter_commit": "abaf9c523780a608bd46686fd5e53740a07077f8",
+    "rust": "1.99.0",
+    "java": "17",
+    "ndk": "28.2.13676358",
+    "base_url": "https://github.com/MetaCubeX/go/releases/download/build/",
+    "archives": {
+      "linux-amd64": {
+        "file": "go1.26.linux-amd64.tar.gz",
+        "sha256": "c1278af2579c9398cf22c638686e5348926b160eda784930d416d95aaa7a9221"
+      },
+      "windows-amd64": {
+        "file": "go1.26.windows-amd64.zip",
+        "sha256": "2483b14ce111fa89ac671cdb00073c5b19670198be1334f491a8f3fe36affeb0"
+      },
+      "windows-arm64": {
+        "file": "go1.26.windows-arm64.zip",
+        "sha256": "48525181fa1663be5d10791a3dbe13210adb19e7d255695636084b34a25926d9"
+      }
+    }
+  }
+}

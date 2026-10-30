@@ -1,0 +1,50 @@
+name: Test
+on:
+  push:
+    branches: [Meta]
+    paths-ignore:
+      - "docs/**"
+      - "README.md"
+      - ".github/ISSUE_TEMPLATE/**"
+  pull_request:
+    branches: [Meta]
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GOTOOLCHAIN: local
+      SKIP_CONCURRENT_TEST: 1
+      SKIP_INTEROP_TEST: 1
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c
+        with:
+          go-download-base-url: https://github.com/MetaCubeX/go/releases/download/build
+          go-version: "1.26"
+      - name: Test upstream and enhanced behavior
+        env:
+          CGO_ENABLED: 0
+        run: |
+          go test -timeout 10m ./...
+          go test -timeout 10m -tags with_gvisor ./...
+      - name: Race check changed packages
+        env:
+          CGO_ENABLED: 1
+        run: go test -race ./adapter ./adapter/outboundgroup ./adapter/provider ./tunnel
+      - name: Build and smoke test kernel
+        env:
+          CGO_ENABLED: 0
+        run: |
+          mkdir -p dist
+          go build -tags with_gvisor -trimpath -o dist/mihomo-smart-linux-amd64 .
+          python3 scripts/smoke-smart-fallback.py
+      - name: Save smoke logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: smart-fallback-validation
+          path: dist/validation/

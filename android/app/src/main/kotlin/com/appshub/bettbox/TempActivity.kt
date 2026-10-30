@@ -1,8 +1,8 @@
-package com.appshub.bettbox
+package io.github.jack4pear.bettboxplus
 
 import android.app.Activity
 import android.os.Bundle
-import com.appshub.bettbox.extensions.wrapAction
+import io.github.jack4pear.bettboxplus.extensions.wrapAction
 
 class TempActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {

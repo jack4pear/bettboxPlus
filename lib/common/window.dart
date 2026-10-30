@@ -13,10 +13,7 @@ class Window {
   Future<void> init() async {
     final props = globalState.config.windowProps;
     if (system.isWindows && !appPath.isPortable) {
-      protocol.register('clash');
-      protocol.register('clashmeta');
-      protocol.register('flclash');
-      protocol.register('bettbox');
+      protocol.register('bettboxplus');
     }
     await windowManager.ensureInitialized();
     if (system.isMacOS && !globalState.config.appSetting.keepDockIcon) {

@@ -1,4 +1,4 @@
-package com.appshub.bettbox
+package io.github.jack4pear.bettboxplus
 
 import android.app.UiModeManager
 import android.content.Context
@@ -10,10 +10,10 @@ import android.util.Log
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import com.appshub.bettbox.plugins.AppPlugin
-import com.appshub.bettbox.plugins.ServicePlugin
-import com.appshub.bettbox.plugins.TilePlugin
-import com.appshub.bettbox.plugins.VpnPlugin
+import io.github.jack4pear.bettboxplus.plugins.AppPlugin
+import io.github.jack4pear.bettboxplus.plugins.ServicePlugin
+import io.github.jack4pear.bettboxplus.plugins.TilePlugin
+import io.github.jack4pear.bettboxplus.plugins.VpnPlugin
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.FlutterEngineGroup
@@ -24,7 +24,7 @@ import io.flutter.plugins.GeneratedPluginRegistrant
 
 class MainActivity : FlutterActivity() {
     companion object {
-        private const val MAIN_ENGINE_ID = "bettbox_main_engine"
+        private const val MAIN_ENGINE_ID = "bettboxplus_main_engine"
     }
 
     private fun isTvDevice(context: Context): Boolean {
@@ -82,7 +82,7 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun createAndCacheEngine(context: Context, cache: FlutterEngineCache): FlutterEngine {
-        val app = context.applicationContext as BettboxApplication
+        val app = context.applicationContext as BettboxPlusApplication
         val options = FlutterEngineGroup.Options(app).apply {
             dartEntrypoint = DartExecutor.DartEntrypoint.createDefault()
         }

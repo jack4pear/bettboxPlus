@@ -1,0 +1,12 @@
+{
+  "source_commit": null,
+  "windows_x64": {
+    "status": "pending",
+    "evidence": ""
+  },
+  "android_arm64": {
+    "status": "pending",
+    "evidence": ""
+  },
+  "other_architectures": "Build verification only; not physical-device tested."
+}

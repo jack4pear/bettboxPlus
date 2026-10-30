@@ -1,4 +1,4 @@
-package com.appshub.bettbox.plugins
+package io.github.jack4pear.bettboxplus.plugins
 
 import android.content.ComponentName
 import android.content.Context
@@ -13,19 +13,19 @@ import android.os.Build
 import android.os.IBinder
 import android.widget.Toast
 import androidx.core.content.getSystemService
-import com.appshub.bettbox.BettboxApplication
-import com.appshub.bettbox.GlobalState
-import com.appshub.bettbox.RunState
-import com.appshub.bettbox.core.Core
-import com.appshub.bettbox.extensions.awaitResult
-import com.appshub.bettbox.extensions.asSocketAddressText
-import com.appshub.bettbox.extensions.resolveDns
-import com.appshub.bettbox.models.StartForegroundParams
-import com.appshub.bettbox.models.VpnOptions
-import com.appshub.bettbox.modules.SuspendModule
-import com.appshub.bettbox.services.BaseServiceInterface
-import com.appshub.bettbox.services.BettboxService
-import com.appshub.bettbox.services.BettboxVpnService
+import io.github.jack4pear.bettboxplus.BettboxPlusApplication
+import io.github.jack4pear.bettboxplus.GlobalState
+import io.github.jack4pear.bettboxplus.RunState
+import io.github.jack4pear.bettboxplus.core.Core
+import io.github.jack4pear.bettboxplus.extensions.awaitResult
+import io.github.jack4pear.bettboxplus.extensions.asSocketAddressText
+import io.github.jack4pear.bettboxplus.extensions.resolveDns
+import io.github.jack4pear.bettboxplus.models.StartForegroundParams
+import io.github.jack4pear.bettboxplus.models.VpnOptions
+import io.github.jack4pear.bettboxplus.modules.SuspendModule
+import io.github.jack4pear.bettboxplus.services.BaseServiceInterface
+import io.github.jack4pear.bettboxplus.services.BettboxPlusService
+import io.github.jack4pear.bettboxplus.services.BettboxPlusVpnService
 import com.google.gson.Gson
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.BinaryMessenger
@@ -73,7 +73,7 @@ data object VpnPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     val networks: MutableSet<Network> = Collections.newSetFromMap(ConcurrentHashMap())
 
     private val connectivity by lazy {
-        BettboxApplication.getAppContext().getSystemService<ConnectivityManager>()
+        BettboxPlusApplication.getAppContext().getSystemService<ConnectivityManager>()
     }
 
     private var bindTimeoutJob: Job? = null
@@ -89,8 +89,8 @@ data object VpnPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             isBind = true
             isBinding.set(false)
             bettBoxService = when (service) {
-                is BettboxVpnService.LocalBinder -> service.getService()
-                is BettboxService.LocalBinder -> service.getService()
+                is BettboxPlusVpnService.LocalBinder -> service.getService()
+                is BettboxPlusService.LocalBinder -> service.getService()
                 else -> throw Exception("invalid binder")
             }
             handleStartService()
@@ -517,11 +517,11 @@ data object VpnPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     fun updateNotificationIcon() {
         scope.launch {
             runCatching {
-                val context = BettboxApplication.getAppContext()
+                val context = BettboxPlusApplication.getAppContext()
                 val notificationManager = context.getSystemService(android.app.NotificationManager::class.java)
                 notificationManager?.cancel(GlobalState.NOTIFICATION_ID)
-                (bettBoxService as? BettboxService)?.resetNotificationBuilder()
-                (bettBoxService as? BettboxVpnService)?.resetNotificationBuilder()
+                (bettBoxService as? BettboxPlusService)?.resetNotificationBuilder()
+                (bettBoxService as? BettboxPlusVpnService)?.resetNotificationBuilder()
                 bettBoxService?.startForeground()
             }.onFailure {
                 android.util.Log.e("VpnPlugin", "updateNotificationIcon error: ${it.message}")
@@ -542,7 +542,7 @@ data object VpnPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     fun updateNotificationSpeed(profileName: String, speedInfo: String) {
         scope.launch {
             runCatching {
-                (bettBoxService as? BettboxVpnService)?.updateNotificationSpeed(profileName, speedInfo)
+                (bettBoxService as? BettboxPlusVpnService)?.updateNotificationSpeed(profileName, speedInfo)
             }.onFailure {
                 android.util.Log.e("VpnPlugin", "updateNotificationSpeed error: ${it.message}")
             }
@@ -552,7 +552,7 @@ data object VpnPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     fun restoreNotification() {
         scope.launch {
             runCatching {
-                (bettBoxService as? BettboxVpnService)?.restoreNotification()
+                (bettBoxService as? BettboxPlusVpnService)?.restoreNotification()
             }.onFailure {
                 android.util.Log.e("VpnPlugin", "restoreNotification error: ${it.message}")
             }
@@ -561,8 +561,8 @@ data object VpnPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
 
     fun setHighPriorityNotification(enabled: Boolean) {
         GlobalState.isNotificationHighPriority = enabled
-        (bettBoxService as? BettboxService)?.resetNotificationBuilder()
-        (bettBoxService as? BettboxVpnService)?.resetNotificationBuilder()
+        (bettBoxService as? BettboxPlusService)?.resetNotificationBuilder()
+        (bettBoxService as? BettboxPlusVpnService)?.resetNotificationBuilder()
         if (GlobalState.currentRunState == RunState.START) {
             scope.launch {
                 startForeground()
@@ -590,7 +590,7 @@ data object VpnPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             try {
                 if (options?.enable == true) {
                     val prepareIntent = try {
-                        android.net.VpnService.prepare(BettboxApplication.getAppContext())
+                        android.net.VpnService.prepare(BettboxPlusApplication.getAppContext())
                     } catch (e: Exception) {
                         null
                     }
@@ -675,7 +675,7 @@ data object VpnPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         }
         if (!canStart) return
 
-        com.appshub.bettbox.core.Core.startTun(
+        io.github.jack4pear.bettboxplus.core.Core.startTun(
             fd = fd ?: 0,
             protect = this@VpnPlugin::protect,
             resolverProcess = this@VpnPlugin::resolverProcess,
@@ -692,7 +692,7 @@ data object VpnPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             }
             if (currentOptions.dozeSuspend) {
                 suspendModule?.uninstall()
-                suspendModule = SuspendModule(BettboxApplication.getAppContext())
+                suspendModule = SuspendModule(BettboxPlusApplication.getAppContext())
                 suspendModule?.install()
             }
         }
@@ -702,10 +702,10 @@ data object VpnPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     private fun startStickyService() {
         GlobalState.runLock.withLock {
             if (GlobalState.currentRunState != RunState.START) return
-            if (bettBoxService !is BettboxVpnService) return
-            val context = BettboxApplication.getAppContext()
+            if (bettBoxService !is BettboxPlusVpnService) return
+            val context = BettboxPlusApplication.getAppContext()
             runCatching {
-                context.startService(Intent(context, BettboxVpnService::class.java))
+                context.startService(Intent(context, BettboxPlusVpnService::class.java))
             }.onFailure {
                 android.util.Log.w("VpnPlugin", "startService error: ${it.message}")
             }
@@ -716,7 +716,7 @@ data object VpnPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         var retries = 0
         while (retries < 5) {
             val success = runCatching {
-                (bettBoxService as? BettboxVpnService)?.protect(fd) == true
+                (bettBoxService as? BettboxPlusVpnService)?.protect(fd) == true
             }.getOrDefault(false)
             
             if (success) return true
@@ -745,7 +745,7 @@ data object VpnPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             return@runCatching ""
         }
         uidPageNameMap.getOrPut(nextUid) {
-            BettboxApplication.getAppContext().packageManager?.getPackagesForUid(nextUid)
+            BettboxPlusApplication.getAppContext().packageManager?.getPackagesForUid(nextUid)
                 ?.firstOrNull() ?: ""
         }
     }.getOrElse {
@@ -774,7 +774,7 @@ data object VpnPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
 
         runCatching {
             if (wasBound) {
-                BettboxApplication.getAppContext().unbindService(connection)
+                BettboxPlusApplication.getAppContext().unbindService(connection)
                 isBind = false
             }
             bettBoxService = null
@@ -782,10 +782,10 @@ data object VpnPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             android.util.Log.e("VpnPlugin", "unbindService error: ${it.message}")
         }
 
-        val context = BettboxApplication.getAppContext()
+        val context = BettboxPlusApplication.getAppContext()
         if (shouldForceStop) {
-            context.stopService(Intent(context, BettboxVpnService::class.java))
-            context.stopService(Intent(context, BettboxService::class.java))
+            context.stopService(Intent(context, BettboxPlusVpnService::class.java))
+            context.stopService(Intent(context, BettboxPlusService::class.java))
         }
 
         runCatching {
@@ -815,13 +815,13 @@ data object VpnPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         suspendModule = null
         Core.stopTun()
         Core.suspended(true)
-        (bettBoxService as? BettboxService)?.resetNotificationBuilder()
-        (bettBoxService as? BettboxVpnService)?.resetNotificationBuilder()
+        (bettBoxService as? BettboxPlusService)?.resetNotificationBuilder()
+        (bettBoxService as? BettboxPlusVpnService)?.resetNotificationBuilder()
         scope.launch {
             startForeground()
         }
         scope.launch(Dispatchers.Main) {
-            Toast.makeText(BettboxApplication.getAppContext(), "Bettbox Suspended", Toast.LENGTH_SHORT).show()
+            Toast.makeText(BettboxPlusApplication.getAppContext(), "BettboxPlus Suspended", Toast.LENGTH_SHORT).show()
         }
         ServicePlugin.notifyNetworkChanged()
     }
@@ -845,11 +845,11 @@ data object VpnPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             if (!startAllowed) return@launch
 
             Core.suspended(false)
-            (bettBoxService as? BettboxService)?.resetNotificationBuilder()
-            (bettBoxService as? BettboxVpnService)?.resetNotificationBuilder()
+            (bettBoxService as? BettboxPlusService)?.resetNotificationBuilder()
+            (bettBoxService as? BettboxPlusVpnService)?.resetNotificationBuilder()
             performStartCore(options, retry = false, notifyOnFailure = false)
             withContext(Dispatchers.Main) {
-                Toast.makeText(BettboxApplication.getAppContext(), "Bettbox Connected", Toast.LENGTH_SHORT).show()
+                Toast.makeText(BettboxPlusApplication.getAppContext(), "BettboxPlus Connected", Toast.LENGTH_SHORT).show()
             }
             ServicePlugin.notifyNetworkChanged()
         }
@@ -874,14 +874,14 @@ data object VpnPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
 
         try {
             if (isBind) {
-                BettboxApplication.getAppContext().unbindService(connection)
+                BettboxPlusApplication.getAppContext().unbindService(connection)
                 isBind = false
             }
             val intent = Intent(
-                BettboxApplication.getAppContext(),
-                if (options?.enable == true) BettboxVpnService::class.java else BettboxService::class.java
+                BettboxPlusApplication.getAppContext(),
+                if (options?.enable == true) BettboxPlusVpnService::class.java else BettboxPlusService::class.java
             )
-            val res = BettboxApplication.getAppContext().bindService(intent, connection, Context.BIND_AUTO_CREATE)
+            val res = BettboxPlusApplication.getAppContext().bindService(intent, connection, Context.BIND_AUTO_CREATE)
             if (!res) {
                 isBinding.set(false)
                 bindTimeoutJob?.cancel()

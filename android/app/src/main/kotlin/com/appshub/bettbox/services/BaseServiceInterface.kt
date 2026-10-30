@@ -1,4 +1,4 @@
-package com.appshub.bettbox.services
+package io.github.jack4pear.bettboxplus.services
 
 import android.annotation.SuppressLint
 import android.app.Notification
@@ -10,9 +10,9 @@ import android.app.Service
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.app.NotificationCompat
-import com.appshub.bettbox.GlobalState
-import com.appshub.bettbox.R
-import com.appshub.bettbox.models.VpnOptions
+import io.github.jack4pear.bettboxplus.GlobalState
+import io.github.jack4pear.bettboxplus.R
+import io.github.jack4pear.bettboxplus.models.VpnOptions
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
@@ -29,14 +29,14 @@ interface BaseServiceInterface {
     suspend fun startForeground()
 }
 
-suspend fun Service.createBettboxNotificationBuilder(
+suspend fun Service.createBettboxPlusNotificationBuilder(
     isSuspended: Boolean = GlobalState.isSmartStopped,
     isHighPriority: Boolean = GlobalState.isNotificationHighPriority
 ): NotificationCompat.Builder =
     withContext(Dispatchers.IO) {
-        val defaultComponent = ComponentName(packageName, "com.appshub.bettbox.MainActivity")
-        val lightComponent = ComponentName(packageName, "com.appshub.bettbox.MainActivityLight")
-        val darkComponent = ComponentName(packageName, "com.appshub.bettbox.MainActivityDark")
+        val defaultComponent = ComponentName(packageName, "io.github.jack4pear.bettboxplus.MainActivity")
+        val lightComponent = ComponentName(packageName, "io.github.jack4pear.bettboxplus.MainActivityLight")
+        val darkComponent = ComponentName(packageName, "io.github.jack4pear.bettboxplus.MainActivityDark")
 
         val targetComponent = NotificationComponentCache.get(packageManager, defaultComponent, lightComponent, darkComponent)
 
@@ -55,7 +55,7 @@ suspend fun Service.createBettboxNotificationBuilder(
             PendingIntent.FLAG_UPDATE_CURRENT
         }
         val pendingIntent = withContext(Dispatchers.Main) {
-            PendingIntent.getActivity(this@createBettboxNotificationBuilder, 0, intent, flags)
+            PendingIntent.getActivity(this@createBettboxPlusNotificationBuilder, 0, intent, flags)
         }
 
         val isDark = targetComponent == darkComponent
@@ -76,12 +76,12 @@ suspend fun Service.createBettboxNotificationBuilder(
         }
         val priority = if (isSuspended || isHighPriority) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_LOW
 
-        NotificationCompat.Builder(this@createBettboxNotificationBuilder, channelId).apply {
+        NotificationCompat.Builder(this@createBettboxPlusNotificationBuilder, channelId).apply {
             setSmallIcon(R.drawable.ic)
             if (largeIconBitmap != null) {
                 setLargeIcon(largeIconBitmap)
             }
-            setContentTitle("Bettbox")
+            setContentTitle("BettboxPlus")
             setContentIntent(pendingIntent)
             setCategory(NotificationCompat.CATEGORY_SERVICE)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -113,9 +113,9 @@ fun Service.ensureNotificationChannel(
             else -> NotificationManager.IMPORTANCE_LOW
         }
         val name = when {
-            isSuspended -> "Bettbox Suspended Service"
-            isHighPriority -> "Bettbox High Priority Service"
-            else -> "Bettbox Service"
+            isSuspended -> "BettboxPlus Suspended Service"
+            isHighPriority -> "BettboxPlus High Priority Service"
+            else -> "BettboxPlus Service"
         }
         val newChannel = NotificationChannel(channelId, name, importance).apply {
             setShowBadge(false)

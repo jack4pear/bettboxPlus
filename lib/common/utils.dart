@@ -1265,7 +1265,7 @@ class Utils {
 
   String encryptSecret(String raw) {
     if (raw.isEmpty) return raw;
-    const salt = 'Bettbox';
+    const salt = 'BettboxPlus';
     final step1 = base64.encode(utf8.encode(raw));
     final step2 = base64.encode(utf8.encode('$salt:$step1'));
     return 'ENC~$step2';
@@ -1274,7 +1274,7 @@ class Utils {
   String decryptSecret(String text) {
     if (!text.startsWith('ENC~')) return text;
     try {
-      const salt = 'Bettbox';
+      const salt = 'BettboxPlus';
       final cipher = text.substring(4);
       final salted = utf8.decode(base64.decode(cipher));
       if (salted.startsWith('$salt:')) {

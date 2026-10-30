@@ -1,0 +1,50 @@
+name: Check
+on:
+  push:
+    branches: [main, 'codex/**']
+  pull_request:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      GOTOOLCHAIN: local
+      SKIP_CONCURRENT_TEST: '1'
+      SKIP_INTEROP_TEST: '1'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - run: python scripts/verify-source.py
+      - run: python scripts/setup-toolchain.py
+      - uses: dtolnay/rust-toolchain@1.99.0
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.7'
+          channel: stable
+          cache: true
+      - name: Bridge and config integration
+        working-directory: core
+        run: go test -tags with_gvisor -timeout 5m ./...
+      - name: Kernel circuit breaker and recovery tests
+        working-directory: core/Clash.Meta
+        run: CGO_ENABLED=1 go test -race -timeout 5m ./adapter ./adapter/outboundgroup ./adapter/provider ./tunnel
+      - name: Offline fault injection
+        working-directory: core/Clash.Meta
+        run: |
+          mkdir -p dist
+          CGO_ENABLED=0 go build -tags with_gvisor -trimpath -o dist/mihomo-smart-linux-amd64 .
+          python scripts/smoke-smart-fallback.py
+      - run: flutter pub get
+      - run: dart run build_runner build
+      - name: Client import and save tests
+        run: flutter test test/common/patch_yaml_config_test.dart test/models/profile_save_test.dart test/common/qr_import_test.dart test/common/release_test.dart
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: validation-logs
+          path: core/Clash.Meta/dist/validation/

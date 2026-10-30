@@ -1,0 +1,47 @@
+name: Publish accepted prerelease
+on:
+  workflow_dispatch:
+    inputs:
+      package_run_id:
+        description: Successful Package BettboxPlus run ID
+        required: true
+        type: string
+      tag:
+        description: Prerelease tag matching client version
+        required: true
+        default: v1.19.7-plus.1
+        type: string
+permissions:
+  contents: write
+  actions: read
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      PACKAGE_RUN_ID: ${{ inputs.package_run_id }}
+      RELEASE_TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - run: python scripts/check-release.py "$PACKAGE_RUN_ID" "$RELEASE_TAG"
+      - name: Download all six targets
+        run: |
+          count=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$PACKAGE_RUN_ID/artifacts" --jq '[.artifacts[] | select(.name | startswith("BettboxPlus-"))] | length')
+          test "$count" = 6
+          gh run download "$PACKAGE_RUN_ID" --repo "$GITHUB_REPOSITORY" --pattern 'BettboxPlus-*' --dir artifacts
+          mkdir dist
+          find artifacts -type f -exec cp {} dist/ \;
+          cd dist
+          for sum in SHA256SUMS-*.txt; do sha256sum -c "$sum"; done
+      - name: Release notes
+        run: |
+          cp docs/INSTALL.md dist/INSTALL.md
+          cp build-lock.json dist/build-lock.json
+          cp docs/ACCEPTANCE.json dist/ACCEPTANCE.json
+          cd dist
+          sha256sum *.exe *.zip *.apk *.json INSTALL.md > SHA256SUMS.txt
+          cp ../docs/RELEASE-NOTES.md ../release.md
+      - name: Publish prerelease
+        run: gh release create "$RELEASE_TAG" dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease --title "BettboxPlus $RELEASE_TAG" --notes-file release.md

@@ -1,15 +1,15 @@
-package com.appshub.bettbox
+package io.github.jack4pear.bettboxplus
 
 import android.content.ComponentName
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.service.quicksettings.TileService
-import com.appshub.bettbox.plugins.AppPlugin
-import com.appshub.bettbox.plugins.ServicePlugin
-import com.appshub.bettbox.plugins.TilePlugin
-import com.appshub.bettbox.plugins.VpnPlugin
-import com.appshub.bettbox.services.BettboxTileService
+import io.github.jack4pear.bettboxplus.plugins.AppPlugin
+import io.github.jack4pear.bettboxplus.plugins.ServicePlugin
+import io.github.jack4pear.bettboxplus.plugins.TilePlugin
+import io.github.jack4pear.bettboxplus.plugins.VpnPlugin
+import io.github.jack4pear.bettboxplus.services.BettboxPlusTileService
 import io.flutter.FlutterInjector
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.dart.DartExecutor
@@ -38,9 +38,9 @@ object GlobalState {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val mainHandler = Handler(Looper.getMainLooper())
 
-    const val NOTIFICATION_CHANNEL = "Bettbox"
-    const val NOTIFICATION_CHANNEL_HIGH = "Bettbox_High"
-    const val NOTIFICATION_CHANNEL_SUSPENDED = "Bettbox_Suspended"
+    const val NOTIFICATION_CHANNEL = "BettboxPlus"
+    const val NOTIFICATION_CHANNEL_HIGH = "BettboxPlus_High"
+    const val NOTIFICATION_CHANNEL_SUSPENDED = "BettboxPlus_Suspended"
     const val NOTIFICATION_ID = 1
 
     private const val TOGGLE_DEBOUNCE_MS = 1000L
@@ -102,13 +102,13 @@ object GlobalState {
     }
 
     private val tileRetryRunnable = Runnable {
-        BettboxTileService.refreshActive()
+        BettboxPlusTileService.refreshActive()
         requestListeningStateSafely()
     }
 
     fun requestTileUpdate() {
         mainHandler.post {
-            BettboxTileService.refreshActive()
+            BettboxPlusTileService.refreshActive()
             requestListeningStateSafely()
             mainHandler.removeCallbacks(tileRetryRunnable)
             mainHandler.postDelayed(tileRetryRunnable, 1000L)
@@ -117,10 +117,10 @@ object GlobalState {
 
     private fun requestListeningStateSafely() {
         runCatching {
-            val context = BettboxApplication.getAppContext()
+            val context = BettboxPlusApplication.getAppContext()
             TileService.requestListeningState(
                 context,
-                ComponentName(context, BettboxTileService::class.java)
+                ComponentName(context, BettboxPlusTileService::class.java)
             )
         }.onFailure {
             android.util.Log.w("GlobalState", "requestTileUpdate failed: ${it.message}")
@@ -142,7 +142,7 @@ object GlobalState {
         isStopping = value
         runCatching {
             val ts = if (value) System.currentTimeMillis() else 0L
-            BettboxApplication.getAppContext()
+            BettboxPlusApplication.getAppContext()
                 .getSharedPreferences("vpn_state", android.content.Context.MODE_PRIVATE)
                 .edit()
                 .putLong("stop_lock_ts", ts)
@@ -153,7 +153,7 @@ object GlobalState {
     fun isCurrentlyStopping(): Boolean {
         if (isStopping) return true
         return runCatching {
-            val sp = BettboxApplication.getAppContext()
+            val sp = BettboxPlusApplication.getAppContext()
                 .getSharedPreferences("vpn_state", android.content.Context.MODE_PRIVATE)
             val ts = sp.getLong("stop_lock_ts", 0L)
             if (ts == 0L) return false
@@ -254,7 +254,7 @@ object GlobalState {
             val defaultArgs = if (flutterEngine == null && !isCurrentlyStopping()) listOf("quick") else null
             val args = flags ?: defaultArgs
             
-            val app = BettboxApplication.getAppContext() as BettboxApplication
+            val app = BettboxPlusApplication.getAppContext() as BettboxPlusApplication
             val vpnService = DartExecutor.DartEntrypoint(
                 FlutterInjector.instance().flutterLoader().findAppBundlePath(),
                 "_service"

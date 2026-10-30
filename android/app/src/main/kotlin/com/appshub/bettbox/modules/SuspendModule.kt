@@ -1,4 +1,4 @@
-package com.appshub.bettbox.modules
+package io.github.jack4pear.bettboxplus.modules
 
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -9,7 +9,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
 import androidx.core.content.getSystemService
-import com.appshub.bettbox.core.Core
+import io.github.jack4pear.bettboxplus.core.Core
 
 class SuspendModule(private val context: Context) {
     private var isInstalled = false
@@ -37,7 +37,7 @@ class SuspendModule(private val context: Context) {
         if (isSuspended) {
             Core.dozeSuspend(false)
             isSuspended = false
-            com.appshub.bettbox.plugins.VpnPlugin.onUpdateNetwork()
+            io.github.jack4pear.bettboxplus.plugins.VpnPlugin.onUpdateNetwork()
         }
     }
 

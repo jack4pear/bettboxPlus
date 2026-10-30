@@ -1,4 +1,4 @@
-package com.appshub.bettbox.services
+package io.github.jack4pear.bettboxplus.services
 
 import android.annotation.SuppressLint
 import android.app.Service
@@ -10,11 +10,11 @@ import android.text.SpannableString
 import android.text.Spanned
 import android.text.style.RelativeSizeSpan
 import androidx.core.app.NotificationCompat
-import com.appshub.bettbox.GlobalState
-import com.appshub.bettbox.R
-import com.appshub.bettbox.models.VpnOptions
+import io.github.jack4pear.bettboxplus.GlobalState
+import io.github.jack4pear.bettboxplus.R
+import io.github.jack4pear.bettboxplus.models.VpnOptions
 
-class BettboxService : Service(), BaseServiceInterface {
+class BettboxPlusService : Service(), BaseServiceInterface {
 
     @Volatile
     private var cachedBuilder: NotificationCompat.Builder? = null
@@ -22,7 +22,7 @@ class BettboxService : Service(), BaseServiceInterface {
     @Volatile
     private var hasStartedForeground = false
 
-    private val fairMemoryHelper = FairMemoryHelper("BettboxService")
+    private val fairMemoryHelper = FairMemoryHelper("BettboxPlusService")
 
     override fun onCreate() {
         super.onCreate()
@@ -34,7 +34,7 @@ class BettboxService : Service(), BaseServiceInterface {
     }
 
     inner class LocalBinder : Binder() {
-        fun getService() = this@BettboxService
+        fun getService() = this@BettboxPlusService
     }
 
     override suspend fun start(options: VpnOptions) = 0
@@ -48,12 +48,12 @@ class BettboxService : Service(), BaseServiceInterface {
             } else {
                 stopForeground(true)
             }
-        }.onFailure { android.util.Log.e("BettboxService", "Failed to stop foreground: ${it.message}") }
+        }.onFailure { android.util.Log.e("BettboxPlusService", "Failed to stop foreground: ${it.message}") }
 
         runCatching {
             getSystemService(android.app.NotificationManager::class.java)
                 ?.cancel(GlobalState.NOTIFICATION_ID)
-        }.onFailure { android.util.Log.e("BettboxService", "Failed to cancel notification: ${it.message}") }
+        }.onFailure { android.util.Log.e("BettboxPlusService", "Failed to cancel notification: ${it.message}") }
 
         stopSelf()
     }
@@ -63,7 +63,7 @@ class BettboxService : Service(), BaseServiceInterface {
     }
 
     private suspend fun notificationBuilder() =
-        cachedBuilder ?: createBettboxNotificationBuilder().also { cachedBuilder = it }
+        cachedBuilder ?: createBettboxPlusNotificationBuilder().also { cachedBuilder = it }
 
     @SuppressLint("ForegroundServiceType")
     override suspend fun startForeground() {
@@ -80,7 +80,7 @@ class BettboxService : Service(), BaseServiceInterface {
             content = getString(R.string.service_running)
         }
 
-        val builder = createBettboxNotificationBuilder(isSuspended, isHighPriority)
+        val builder = createBettboxPlusNotificationBuilder(isSuspended, isHighPriority)
         val notification = builder
             .setContentTitle(title)
             .setContentText(content)

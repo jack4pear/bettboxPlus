@@ -41,7 +41,7 @@ void main() {
     expect(target?.port, 5202);
     expect(target?.name, '客厅 电视');
     expect(parseIperfLink('https://example.com'), isNull);
-    expect(parseIperfLink('bettbox://iperf?port=5201'), isNull);
+    expect(parseIperfLink('bettboxplus://iperf?port=5201'), isNull);
   });
 
   test('解析内核推送的状态', () {

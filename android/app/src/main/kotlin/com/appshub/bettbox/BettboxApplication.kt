@@ -1,4 +1,4 @@
-package com.appshub.bettbox
+package io.github.jack4pear.bettboxplus
 
 import android.app.Application
 import android.content.Context
@@ -7,9 +7,9 @@ import android.os.Build
 import io.flutter.FlutterInjector
 import io.flutter.embedding.engine.FlutterEngineGroup
 
-class BettboxApplication : Application() {
+class BettboxPlusApplication : Application() {
     companion object {
-        private lateinit var instance: BettboxApplication
+        private lateinit var instance: BettboxPlusApplication
         fun getAppContext(): Context = instance.applicationContext
     }
 

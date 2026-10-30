@@ -17,7 +17,7 @@ void main() {
 
   void setVersion(String version, String buildNumber) {
     globalState.packageInfo = PackageInfo(
-      appName: 'Bettbox',
+      appName: 'BettboxPlus',
       packageName: 'test',
       version: version,
       buildNumber: buildNumber,

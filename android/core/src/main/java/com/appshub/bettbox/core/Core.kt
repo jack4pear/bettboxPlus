@@ -1,4 +1,4 @@
-package com.appshub.bettbox.core
+package io.github.jack4pear.bettboxplus.core
 
 import android.util.Log
 import java.net.InetSocketAddress

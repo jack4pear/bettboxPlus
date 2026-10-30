@@ -1,11 +1,11 @@
-package com.appshub.bettbox.plugins
+package io.github.jack4pear.bettboxplus.plugins
 
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import com.appshub.bettbox.GlobalState
-import com.appshub.bettbox.RunState
-import com.appshub.bettbox.models.VpnOptions
+import io.github.jack4pear.bettboxplus.GlobalState
+import io.github.jack4pear.bettboxplus.RunState
+import io.github.jack4pear.bettboxplus.models.VpnOptions
 import com.google.gson.Gson
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall

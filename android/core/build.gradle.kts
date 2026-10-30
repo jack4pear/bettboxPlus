@@ -3,7 +3,7 @@ plugins {
 }
 
 android {
-    namespace = "com.appshub.bettbox.core"
+    namespace = "io.github.jack4pear.bettboxplus.core"
     compileSdk = 36
     ndkVersion = "28.2.13676358"
 

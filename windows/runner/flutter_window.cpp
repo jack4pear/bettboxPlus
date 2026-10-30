@@ -9,9 +9,9 @@
 #include "flutter/generated_plugin_registrant.h"
 
 #ifdef BETTBOX_DEV
-#define BETTBOX_REG_KEY L"Software\\BettboxDev"
+#define BETTBOX_REG_KEY L"Software\\BettboxPlusDev"
 #else
-#define BETTBOX_REG_KEY L"Software\\Bettbox"
+#define BETTBOX_REG_KEY L"Software\\BettboxPlus"
 #endif
 
 // TODO: Legacy cleanup routines to revert modified shortcuts/registry for users
@@ -167,7 +167,7 @@ void CleanupLegacyIconSettings() {
 
 constexpr const char kClipboardChannel[] = "clipboard_ext";
 constexpr const char kPasteMethod[] = "paste";
-constexpr const wchar_t kFlutterWindowProp[] = L"BettboxFlutterWindow";
+constexpr const wchar_t kFlutterWindowProp[] = L"BettboxPlusFlutterWindow";
 
 }  // namespace
 
