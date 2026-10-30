@@ -61,10 +61,26 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: subosito/flutter-action@v2
+        if: matrix.platform != 'windows' || matrix.arch != 'arm64'
         with:
           flutter-version: '3.47.7'
           channel: stable
           cache: true
+      - name: Bootstrap pinned Flutter on Windows ARM64
+        if: matrix.platform == 'windows' && matrix.arch == 'arm64'
+        shell: pwsh
+        run: |
+          $flutterRoot = Join-Path $env:GITHUB_WORKSPACE '.toolchain/flutter-arm64'
+          git clone --depth 1 --branch 3.47.7 https://github.com/flutter/flutter.git $flutterRoot
+          if ($LASTEXITCODE -ne 0) { throw 'Flutter checkout failed' }
+          $lock = Get-Content build-lock.json | ConvertFrom-Json
+          $actual = git -C $flutterRoot rev-parse HEAD
+          if ($actual -ne $lock.toolchain.flutter_commit) { throw 'Flutter source commit mismatch' }
+          $env:PROCESSOR_ARCHITECTURE = 'ARM64'
+          & "$flutterRoot/bin/flutter.bat" --version
+          if ($LASTEXITCODE -ne 0) { throw 'Native Flutter bootstrap failed' }
+          & "$flutterRoot/bin/cache/dart-sdk/bin/dart.exe" --version
+          "$flutterRoot/bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
       - run: flutter pub get
       - run: dart run build_runner build
       - name: Android NDK

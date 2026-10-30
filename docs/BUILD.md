@@ -8,7 +8,7 @@
 
 `core/Clash.Meta` 是 MihomoPlus 指定提交的源码快照，加 `patches/bettbox-bridge.patch`。补丁保留 Bettbox 的 Android VPN、回调、流量统计及监听器改动。复现方式：在空目录检出锁定提交，然后 `git apply patches/bettbox-bridge.patch`。`core/kernel-files.json` 对最终源码逐文件锁定，`python scripts/verify-source.py` 在各平台构建前校验。Git 保留上游完整客户端历史。
 
-Python 使用 uv 或既有运行时，Go/Rust 由 mise 管理。Flutter 固定为 3.47.7，Git 提交亦在锁文件。Windows 使用 Windows runner，Android 使用 Ubuntu runner。
+Python 使用 uv 或既有运行时，Go/Rust 由 mise 管理。Flutter 固定为 3.47.7，Git 提交亦在锁文件。Windows 使用 Windows runner，Android 使用 Ubuntu runner。Windows ARM64 在原生 ARM runner 从固定 Flutter 提交初始化 SDK；该稳定版未提供预打包的 Windows ARM64 SDK，但固定引擎的原生 Dart 与 Windows ARM64 构建归档可用。
 
 ## 验证
 
