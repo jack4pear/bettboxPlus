@@ -8,5 +8,144 @@
     "status": "pending",
     "evidence": ""
   },
-  "other_architectures": "Build verification only; not physical-device tested."
+  "other_architectures": "Build verification only; not physical-device tested.",
+  "build_verification": {
+    "status": "passed",
+    "date": "2026-10-30",
+    "source_commit": "acde77934d3087eecf1fb5dd2480d1d4250d4b4d",
+    "kernel_commit": "3803eebbdb4ac3e92d39b1104e1c5ae668c2b18f",
+    "workflow_run_url": "https://github.com/jack4pear/bettboxPlus/actions/runs/41058638604",
+    "automated_tests": "passed: Go bridge, kernel race, offline fault injection, 19 Flutter import/save/update tests",
+    "scope": "Build and static artifact verification only. No physical-device acceptance or release in this round.",
+    "notes": "compiled_kernel_sha256 names pre-packaging Go outputs; packaged_kernel_sha256 names libraries extracted from signed APKs after Android Gradle packaging.",
+    "artifacts": [
+      {
+        "target": "BettboxPlus-android-amd64",
+        "source_commit": "acde77934d3087eecf1fb5dd2480d1d4250d4b4d",
+        "kernel_commit": "3803eebbdb4ac3e92d39b1104e1c5ae668c2b18f",
+        "checksums": "passed",
+        "application_id": "io.github.jack4pear.bettboxplus",
+        "jni_namespace": "verified",
+        "packaged_kernel_sha256": {
+          "x86_64": "d86860b04fd3cab1ab8ffe14b498a2114725eea1b1a9274aa61869176ae6f7af"
+        },
+        "compiled_kernel_sha256": {
+          "x86_64": "57b113a89d91deed814635d04d2d8aa43c6cf016ed172cae763fd1838d9f78be"
+        },
+        "embedded_source_revision": "verified",
+        "elf_page_alignment": {
+          "x86_64": 16384
+        },
+        "android_abis": [
+          "x86_64"
+        ],
+        "signing_certificate_sha256": "26252452ab2b17ce7704cd1153c1fd329e3ee86db7d3e605296059a4f3866782",
+        "artifact_files": {
+          "BettboxPlus-1.19.7-plus.1-android-x86_64.apk": "61a06d3d6d83fa4c24b7129f49ee3786ed5d05cf8c0970bfa9bd33d641582735"
+        }
+      },
+      {
+        "target": "BettboxPlus-android-arm",
+        "source_commit": "acde77934d3087eecf1fb5dd2480d1d4250d4b4d",
+        "kernel_commit": "3803eebbdb4ac3e92d39b1104e1c5ae668c2b18f",
+        "checksums": "passed",
+        "application_id": "io.github.jack4pear.bettboxplus",
+        "jni_namespace": "verified",
+        "packaged_kernel_sha256": {
+          "armeabi-v7a": "673e394c1414200e6f0d8d8067f1714a231de360e25711d2bc2d6787d17bfa5c"
+        },
+        "compiled_kernel_sha256": {
+          "armeabi-v7a": "0446dd7242f165cc68f9a857dbbcf8fde52388fa5347a22f5cb0b4ab1085a6ae"
+        },
+        "embedded_source_revision": "verified",
+        "android_abis": [
+          "armeabi-v7a"
+        ],
+        "signing_certificate_sha256": "26252452ab2b17ce7704cd1153c1fd329e3ee86db7d3e605296059a4f3866782",
+        "artifact_files": {
+          "BettboxPlus-1.19.7-plus.1-android-armeabi-v7a.apk": "67ea52c4ac7cc2a0ef95e80727acfd60a1ae2a56d5ba139e283032991b362660"
+        }
+      },
+      {
+        "target": "BettboxPlus-android-arm64",
+        "source_commit": "acde77934d3087eecf1fb5dd2480d1d4250d4b4d",
+        "kernel_commit": "3803eebbdb4ac3e92d39b1104e1c5ae668c2b18f",
+        "checksums": "passed",
+        "application_id": "io.github.jack4pear.bettboxplus",
+        "jni_namespace": "verified",
+        "packaged_kernel_sha256": {
+          "arm64-v8a": "a7d225a24c34b9ba8e92bc497ef12f147ab3601f75c13f812aa41575d3c1fce3"
+        },
+        "compiled_kernel_sha256": {
+          "arm64-v8a": "bc4e90681d61f3399de0200b10f948b0cacbe95f2b725bc73f56c5dcf1884f10"
+        },
+        "embedded_source_revision": "verified",
+        "elf_page_alignment": {
+          "arm64-v8a": 16384
+        },
+        "android_abis": [
+          "arm64-v8a"
+        ],
+        "signing_certificate_sha256": "26252452ab2b17ce7704cd1153c1fd329e3ee86db7d3e605296059a4f3866782",
+        "artifact_files": {
+          "BettboxPlus-1.19.7-plus.1-android-arm64-v8a.apk": "80fc6002a1b82a79d4052cd19dc899237a584cc0a3171d387ea2fcd2732a1f2c"
+        }
+      },
+      {
+        "target": "BettboxPlus-android-universal",
+        "source_commit": "acde77934d3087eecf1fb5dd2480d1d4250d4b4d",
+        "kernel_commit": "3803eebbdb4ac3e92d39b1104e1c5ae668c2b18f",
+        "checksums": "passed",
+        "application_id": "io.github.jack4pear.bettboxplus",
+        "jni_namespace": "verified",
+        "packaged_kernel_sha256": {
+          "arm64-v8a": "a7d225a24c34b9ba8e92bc497ef12f147ab3601f75c13f812aa41575d3c1fce3",
+          "armeabi-v7a": "673e394c1414200e6f0d8d8067f1714a231de360e25711d2bc2d6787d17bfa5c",
+          "x86_64": "d86860b04fd3cab1ab8ffe14b498a2114725eea1b1a9274aa61869176ae6f7af"
+        },
+        "compiled_kernel_sha256": {
+          "arm64-v8a": "bc4e90681d61f3399de0200b10f948b0cacbe95f2b725bc73f56c5dcf1884f10",
+          "armeabi-v7a": "0446dd7242f165cc68f9a857dbbcf8fde52388fa5347a22f5cb0b4ab1085a6ae",
+          "x86_64": "57b113a89d91deed814635d04d2d8aa43c6cf016ed172cae763fd1838d9f78be"
+        },
+        "embedded_source_revision": "verified",
+        "elf_page_alignment": {
+          "arm64-v8a": 16384,
+          "x86_64": 16384
+        },
+        "android_abis": [
+          "arm64-v8a",
+          "armeabi-v7a",
+          "x86_64"
+        ],
+        "signing_certificate_sha256": "26252452ab2b17ce7704cd1153c1fd329e3ee86db7d3e605296059a4f3866782",
+        "artifact_files": {
+          "BettboxPlus-1.19.7-plus.1-android-universal.apk": "095bd51f0d9958fdda10576127bf7e98b3af3bb7fa64693cc679220080eaf7c5"
+        }
+      },
+      {
+        "target": "BettboxPlus-windows-amd64",
+        "source_commit": "acde77934d3087eecf1fb5dd2480d1d4250d4b4d",
+        "kernel_commit": "3803eebbdb4ac3e92d39b1104e1c5ae668c2b18f",
+        "checksums": "passed",
+        "artifact_files": {
+          "BettboxPlus-1.19.7-plus.1-windows-amd64-compatible-portable.zip": "cc195490af9ade140c58cda29285bc9d6081d0e64c745b0a8f03000a66559caf",
+          "BettboxPlus-1.19.7-plus.1-windows-amd64-compatible-setup.exe": "4d2fefa9996fe4f5d5635de65ef7c23c39b2bccc47daf096c847fc6836d55b9a"
+        },
+        "pe_architecture": "AMD64",
+        "goamd64": "v1"
+      },
+      {
+        "target": "BettboxPlus-windows-arm64",
+        "source_commit": "acde77934d3087eecf1fb5dd2480d1d4250d4b4d",
+        "kernel_commit": "3803eebbdb4ac3e92d39b1104e1c5ae668c2b18f",
+        "checksums": "passed",
+        "artifact_files": {
+          "BettboxPlus-1.19.7-plus.1-windows-arm64-setup.exe": "cc57cd0a6450b4f945ef799cb26c4eaba68c177d0d2a6d8179831cbc01961bc5"
+        },
+        "build_runner": "native Windows ARM64",
+        "kernel_version_check": "passed in Windows runner; full pinned commit printed"
+      }
+    ]
+  }
 }
