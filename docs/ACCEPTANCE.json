@@ -1,12 +1,18 @@
 {
-  "source_commit": null,
+  "source_commit": "acde77934d3087eecf1fb5dd2480d1d4250d4b4d",
   "windows_x64": {
-    "status": "pending",
-    "evidence": ""
+    "status": "passed",
+    "evidence": "2026-10-31: Maintainer confirmed in this Codex conversation: 实机验收通过. User-reported acceptance for the planned release scope; device model, OS version, per-step results and logs were not supplied.",
+    "confirmed_by": "maintainer (user report)",
+    "confirmation_date": "2026-10-31",
+    "independently_reproduced_by_agent": false
   },
   "android_arm64": {
-    "status": "pending",
-    "evidence": ""
+    "status": "passed",
+    "evidence": "2026-10-31: Maintainer confirmed in this Codex conversation: 实机验收通过. User-reported acceptance for the planned release scope; device model, OS version, per-step results and logs were not supplied.",
+    "confirmed_by": "maintainer (user report)",
+    "confirmation_date": "2026-10-31",
+    "independently_reproduced_by_agent": false
   },
   "other_architectures": "Build verification only; not physical-device tested.",
   "build_verification": {
